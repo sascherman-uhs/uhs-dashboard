@@ -2060,8 +2060,11 @@
 
             const activeVol = activeListings.reduce((s, l) => s + Number(l.current_price || 0), 0);
             const soldVol = soldListings.reduce((s, l) => s + Number(l.sold_price || l.current_price || 0), 0);
-            const avgDom = activeListings.length > 0
-                ? Math.round(activeListings.reduce((s, l) => s + (l.dom || 0), 0) / activeListings.length)
+            const domPool = activeListings.length > 0 ? activeListings
+                : soldListings.length > 0 ? soldListings : listings;
+            const domVals = domPool.filter(l => l.dom != null);
+            const avgDom = domVals.length > 0
+                ? Math.round(domVals.reduce((s, l) => s + l.dom, 0) / domVals.length)
                 : '—';
 
             // Get best phone/email from most recent listing
