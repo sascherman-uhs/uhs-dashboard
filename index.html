@@ -1,0 +1,2685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UHS MLS Market Summary</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <style>
+        :root {
+            --navy: #1a2332;
+            --navy-light: #243044;
+            --gold: #c5a55a;
+            --gold-light: #d4bc7e;
+            --gold-dark: #a88b3d;
+            --white: #ffffff;
+            --gray-50: #f8f9fa;
+            --gray-100: #f0f1f3;
+            --gray-200: #e1e3e6;
+            --gray-400: #9ba0a8;
+            --gray-600: #6b7280;
+            --gray-800: #374151;
+            --green: #22c55e;
+            --red: #ef4444;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-800);
+            line-height: 1.5;
+        }
+
+        /* Header */
+        .header {
+            background: var(--navy);
+            color: var(--white);
+            padding: 20px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        .header h1 span {
+            color: var(--gold);
+        }
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .header label {
+            font-size: 13px;
+            color: var(--gray-400);
+        }
+        .header input[type="date"] {
+            padding: 6px 10px;
+            border: 1px solid var(--navy-light);
+            border-radius: 6px;
+            background: var(--navy-light);
+            color: var(--white);
+            font-size: 13px;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-gold {
+            background: var(--gold);
+            color: var(--navy);
+        }
+        .btn-gold:hover { background: var(--gold-light); }
+        .btn-outline {
+            background: transparent;
+            color: var(--gold);
+            border: 1px solid var(--gold);
+        }
+        .btn-outline:hover { background: rgba(197, 165, 90, 0.1); }
+
+        .data-freshness {
+            font-size: 11px;
+            color: var(--gray-400);
+            text-align: right;
+            padding: 6px 32px;
+            background: var(--navy);
+            border-top: 1px solid var(--navy-light);
+        }
+
+        /* Main content */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px 32px;
+        }
+
+        /* KPI Cards */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+        .kpi-card {
+            background: var(--white);
+            border-radius: 10px;
+            padding: 18px 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            border: 1px solid var(--gray-200);
+        }
+        .kpi-card.highlight {
+            background: var(--navy);
+            color: var(--white);
+            border-color: var(--navy);
+        }
+        .kpi-card.highlight .kpi-label { color: var(--gold-light); }
+        .kpi-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--gray-600);
+            margin-bottom: 6px;
+        }
+        .kpi-value {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -1px;
+        }
+        .kpi-sub {
+            font-size: 12px;
+            color: var(--gray-400);
+            margin-top: 2px;
+        }
+        .kpi-card.highlight .kpi-sub { color: var(--gray-400); }
+
+        /* Charts */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 28px;
+        }
+        .chart-card {
+            background: var(--white);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            border: 1px solid var(--gray-200);
+        }
+        .chart-card h3 {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--navy);
+        }
+        .chart-container {
+            position: relative;
+            height: 280px;
+        }
+
+        /* Table */
+        .table-card {
+            background: var(--white);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            border: 1px solid var(--gray-200);
+            overflow-x: auto;
+        }
+        .table-card h3 {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--navy);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        thead th {
+            text-align: right;
+            padding: 8px 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--gray-600);
+            border-bottom: 2px solid var(--gray-200);
+        }
+        thead th:first-child { text-align: left; }
+        thead th.section-active {
+            color: var(--navy);
+            border-bottom-color: var(--navy);
+        }
+        thead th.section-sold {
+            color: var(--gold-dark);
+            border-bottom-color: var(--gold);
+        }
+        tbody td {
+            text-align: right;
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--gray-100);
+        }
+        tbody td:first-child {
+            text-align: left;
+            font-weight: 600;
+            color: var(--navy);
+        }
+        tbody tr:hover { background: var(--gray-50); }
+        tfoot td {
+            text-align: right;
+            padding: 10px 12px;
+            font-weight: 700;
+            border-top: 2px solid var(--gray-200);
+            color: var(--navy);
+        }
+        tfoot td:first-child { text-align: left; }
+
+        /* Section divider */
+        .section-divider {
+            margin: 36px 0 24px;
+            border-top: 2px solid var(--gray-200);
+            padding-top: 24px;
+        }
+        .section-divider h2 {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--navy);
+            margin-bottom: 16px;
+        }
+        .section-divider h2 span { color: var(--gold); }
+
+        /* Agent search */
+        .agent-search-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            position: relative;
+        }
+        .agent-search-bar input[type="text"] {
+            flex: 1;
+            max-width: 400px;
+            padding: 10px 14px;
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .agent-search-bar input[type="text"]:focus {
+            border-color: var(--gold);
+            box-shadow: 0 0 0 3px rgba(197, 165, 90, 0.15);
+        }
+
+        /* Agent detail panel */
+        .agent-detail {
+            background: var(--white);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            border: 1px solid var(--gray-200);
+            margin-bottom: 20px;
+            display: none;
+        }
+        .agent-detail.visible { display: block; }
+        .agent-detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .agent-detail-header h3 {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--navy);
+        }
+        .agent-detail-header .office {
+            font-size: 13px;
+            color: var(--gray-600);
+        }
+        .agent-kpis {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+        .agent-kpi {
+            text-align: center;
+        }
+        .agent-kpi .val {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--navy);
+        }
+        .agent-kpi .lbl {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--gray-600);
+        }
+
+        /* Status badges */
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .status-active { background: #dcfce7; color: #166534; }
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-sold { background: #dbeafe; color: #1e40af; }
+        .status-other { background: var(--gray-100); color: var(--gray-600); }
+
+        /* Top agents and agent listings — reuse table-card */
+        .agents-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        /* Rank column */
+        .rank-cell {
+            font-weight: 700;
+            color: var(--gold-dark);
+            text-align: center !important;
+            width: 36px;
+        }
+
+        /* Clickable row */
+        tbody tr.clickable { cursor: pointer; }
+        tbody tr.clickable:hover { background: #f0f4ff; }
+
+        /* Market comparison colors */
+        .over-market { color: #dc2626; font-weight: 600; }
+        .under-market { color: #16a34a; font-weight: 600; }
+        .at-market { color: var(--gray-600); }
+
+        /* Property detail card */
+        .prop-specs {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+        .prop-spec {
+            text-align: center;
+            padding: 8px;
+            background: var(--gray-50);
+            border-radius: 6px;
+        }
+        .prop-spec .val {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--navy);
+        }
+        .prop-spec .lbl {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--gray-600);
+        }
+
+        /* Contact info */
+        .contact-line {
+            font-size: 13px;
+            color: var(--gray-600);
+            margin-top: 4px;
+        }
+        .contact-line a {
+            color: var(--gold-dark);
+            text-decoration: none;
+        }
+        .contact-line a:hover { text-decoration: underline; }
+
+        /* MLS link */
+        a.mls-link {
+            color: var(--gold-dark);
+            text-decoration: none;
+            font-weight: 600;
+        }
+        a.mls-link:hover { text-decoration: underline; }
+
+        /* Property search results list */
+        .prop-results {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .prop-result-item {
+            padding: 10px 14px;
+            background: var(--gray-50);
+            border: 1px solid var(--gray-200);
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .prop-result-item:hover { border-color: var(--gold); background: #fffbf0; }
+        .prop-result-item .addr { font-weight: 600; color: var(--navy); }
+        .prop-result-item .meta { font-size: 12px; color: var(--gray-600); }
+
+        /* Trend arrows — semantic: good=green, bad=red */
+        .trend-good { color: #16a34a; font-weight: 600; }
+        .trend-bad { color: #dc2626; font-weight: 600; }
+        .trend-flat { color: var(--gray-400); }
+        .trend-arrow { font-size: 14px; margin-right: 2px; }
+
+        /* Hidden DOM bar */
+        .hidden-bar-container {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .hidden-bar {
+            height: 16px;
+            border-radius: 3px;
+            min-width: 2px;
+        }
+        .hidden-bar.reported { background: var(--navy); }
+        .hidden-bar.actual { background: var(--red); opacity: 0.7; }
+        .hidden-pct-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            background: #fef2f2;
+            color: #dc2626;
+        }
+
+        /* Volume grid (heat map) */
+        .volume-grid-wrapper {
+            margin-bottom: 28px;
+        }
+        .volume-grid-wrapper h3 {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--navy);
+            margin-bottom: 12px;
+        }
+        .volume-grid {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        .volume-grid th {
+            padding: 6px 8px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            color: var(--gray-600);
+            text-align: center;
+            border-bottom: 2px solid var(--gray-200);
+        }
+        .volume-grid th:first-child { text-align: left; width: 60px; }
+        .volume-grid td {
+            padding: 6px 8px;
+            text-align: center;
+            border-bottom: 1px solid var(--gray-100);
+            font-variant-numeric: tabular-nums;
+        }
+        .volume-grid td:first-child {
+            text-align: left;
+            font-weight: 700;
+            color: var(--navy);
+        }
+        .volume-grid td.partial {
+            color: var(--gray-400);
+            font-style: italic;
+        }
+        .volume-grid tr:hover td { background: var(--gray-50); }
+        .volume-grid .yr-total {
+            font-weight: 700;
+            color: var(--navy);
+            background: var(--gray-50);
+        }
+        .volume-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 16px;
+        }
+        .volume-tab {
+            padding: 8px 20px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid var(--gray-200);
+            background: var(--white);
+            color: var(--gray-600);
+        }
+        .volume-tab:first-child { border-radius: 6px 0 0 6px; }
+        .volume-tab:last-child { border-radius: 0 6px 6px 0; }
+        .volume-tab.active {
+            background: var(--navy);
+            color: var(--white);
+            border-color: var(--navy);
+        }
+
+        /* Freshness badges */
+        .freshness-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 6px;
+        }
+        .freshness-badge.fresh {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+        .freshness-badge.stale-warn {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+        }
+        .freshness-badge.stale-danger {
+            background: rgba(239, 68, 68, 0.25);
+            color: #ef4444;
+        }
+
+        /* Coverage panel */
+        .coverage-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .coverage-card {
+            background: var(--white);
+            border-radius: 10px;
+            padding: 16px 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            border: 1px solid var(--gray-200);
+        }
+        .coverage-card.stale { border-left: 4px solid var(--red); }
+        .coverage-card.warn { border-left: 4px solid #f59e0b; }
+        .coverage-card.fresh { border-left: 4px solid var(--green); }
+        .coverage-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .coverage-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--navy);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .coverage-meta {
+            font-size: 12px;
+            color: var(--gray-600);
+            margin-top: 4px;
+        }
+        .coverage-cmd {
+            background: var(--navy);
+            color: var(--gold-light);
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 12px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-top: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .coverage-cmd .copy-btn {
+            background: transparent;
+            border: 1px solid var(--gold);
+            color: var(--gold);
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .coverage-cmd .copy-btn:hover { background: rgba(197, 165, 90, 0.15); }
+
+        /* Clickable count cells in summary table */
+        .clickable-count {
+            text-decoration: underline;
+            text-decoration-color: var(--gray-400);
+            text-underline-offset: 2px;
+            cursor: pointer;
+            transition: color 0.15s, text-decoration-color 0.15s;
+        }
+        .clickable-count:hover {
+            color: var(--gold-dark);
+            text-decoration-color: var(--gold);
+        }
+
+        /* Price range drill-down panel */
+        .drilldown-card {
+            background: var(--white);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            border: 1px solid var(--gray-200);
+            margin-top: 20px;
+            display: none;
+        }
+        .drilldown-card.visible { display: block; }
+        .drilldown-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .drilldown-header h3 {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--navy);
+        }
+        .drilldown-close {
+            background: transparent;
+            border: 1px solid var(--gray-200);
+            color: var(--gray-600);
+            font-size: 12px;
+            font-weight: 600;
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .drilldown-close:hover { background: var(--gray-50); border-color: var(--gray-400); }
+
+        /* Redfin link styling */
+        a.redfin-link {
+            color: var(--navy);
+            text-decoration: none;
+            font-weight: 600;
+        }
+        a.redfin-link:hover { color: var(--gold-dark); text-decoration: underline; }
+
+        /* Agent pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            margin-top: 12px;
+            font-size: 13px;
+            color: var(--gray-600);
+        }
+        .pagination .btn {
+            padding: 6px 14px;
+            font-size: 12px;
+        }
+        .pagination .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* Login screen */
+        .login-screen {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: var(--navy);
+        }
+        .login-card {
+            background: var(--white);
+            border-radius: 12px;
+            padding: 40px;
+            width: 100%;
+            max-width: 380px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+        }
+        .login-card h2 {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--navy);
+            margin-bottom: 4px;
+        }
+        .login-card h2 span { color: var(--gold); }
+        .login-card .login-sub {
+            font-size: 13px;
+            color: var(--gray-600);
+            margin-bottom: 24px;
+        }
+        .login-card label {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--gray-600);
+            display: block;
+            margin-bottom: 4px;
+        }
+        .login-card input[type="email"],
+        .login-card input[type="password"] {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            margin-bottom: 16px;
+            transition: border-color 0.2s;
+        }
+        .login-card input:focus {
+            border-color: var(--gold);
+            box-shadow: 0 0 0 3px rgba(197, 165, 90, 0.15);
+        }
+        .login-card .btn-login {
+            width: 100%;
+            padding: 12px;
+            background: var(--gold);
+            color: var(--navy);
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .login-card .btn-login:hover { background: var(--gold-light); }
+        .login-card .btn-login:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .login-error {
+            background: #fef2f2;
+            color: var(--red);
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            margin-bottom: 16px;
+            display: none;
+        }
+        .app-wrapper { display: none; }
+        .app-wrapper.visible { display: block; }
+        .logout-btn {
+            background: transparent;
+            border: 1px solid var(--gold);
+            color: var(--gold);
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .logout-btn:hover { background: rgba(197, 165, 90, 0.1); }
+
+        /* Loading */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 60px;
+            color: var(--gray-400);
+            font-size: 14px;
+        }
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--gray-200);
+            border-top-color: var(--gold);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 10px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Error */
+        .error-msg {
+            background: #fef2f2;
+            color: var(--red);
+            padding: 16px 20px;
+            border-radius: 8px;
+            border: 1px solid #fecaca;
+            margin: 20px 0;
+            font-size: 13px;
+        }
+
+        /* Print styles */
+        @media print {
+            body { background: white; }
+            .header { padding: 12px 20px; }
+            .header-controls .btn { display: none; }
+            .data-freshness { padding: 4px 20px; }
+            .container { padding: 12px 20px; }
+            .kpi-grid { gap: 8px; margin-bottom: 16px; }
+            .kpi-card { padding: 10px 14px; }
+            .kpi-value { font-size: 22px; }
+            .charts-grid { gap: 12px; margin-bottom: 16px; }
+            .chart-container { height: 220px; }
+            .table-card { padding: 12px; }
+            table { font-size: 11px; }
+            thead th, tbody td, tfoot td { padding: 5px 8px; }
+            .section-divider { margin: 20px 0 12px; padding-top: 12px; }
+            .coverage-grid { gap: 8px; margin-bottom: 12px; }
+            .coverage-cmd { display: none; }
+            .agent-search-bar { display: none; }
+            .drilldown-card { display: none !important; }
+            .volume-grid { font-size: 10px; }
+            .volume-grid th, .volume-grid td { padding: 4px 6px; }
+            .volume-tabs { display: none; }
+            .agent-detail { padding: 12px; }
+
+            @page {
+                size: landscape;
+                margin: 0.4in;
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header { padding: 16px; }
+            .container { padding: 16px; }
+            .charts-grid { grid-template-columns: 1fr; }
+            .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+            .coverage-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div class="login-screen" id="loginScreen">
+        <div class="login-card">
+            <h2><span>UHS</span> Market Dashboard</h2>
+            <div class="login-sub">Sign in to access MLS market data</div>
+            <div class="login-error" id="loginError"></div>
+            <form onsubmit="handleLogin(event)">
+                <label>Email</label>
+                <input type="email" id="loginEmail" required autocomplete="email">
+                <label>Password</label>
+                <input type="password" id="loginPassword" required autocomplete="current-password">
+                <button type="submit" class="btn-login" id="loginBtn">Sign In</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Dashboard (hidden until authenticated) -->
+    <div class="app-wrapper" id="appWrapper">
+    <div class="header">
+        <div>
+            <h1><span>UHS</span> MLS Market Summary</h1>
+            <div id="headerFreshness" style="font-size: 12px; color: var(--gray-400); margin-top: 4px;">Loading...</div>
+        </div>
+        <div class="header-controls">
+            <div>
+                <label>Sales From</label>
+                <input type="date" id="startDate">
+            </div>
+            <div>
+                <label>Sales To</label>
+                <input type="date" id="endDate">
+            </div>
+            <button class="btn btn-gold" onclick="loadData()">Update</button>
+            <button class="btn btn-outline" onclick="window.print()">Print</button>
+            <button class="btn btn-outline" id="refreshBtn" onclick="copyRefreshCmd()" title="Copy /export-mls command to clipboard">/export-mls</button>
+            <button class="logout-btn" onclick="handleLogout()">Logout</button>
+        </div>
+    </div>
+    <div class="data-freshness" id="freshness">Loading...</div>
+
+    <div class="container">
+        <!-- Data Coverage Panel -->
+        <div class="coverage-grid" id="coverageGrid"></div>
+
+        <!-- KPI Cards -->
+        <div class="kpi-grid" id="kpiGrid">
+            <div class="loading"><div class="spinner"></div>Loading market data...</div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h3>Active Inventory by Price Range</h3>
+                <div class="chart-container"><canvas id="activeChart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <h3>Sold by Price Range</h3>
+                <div class="chart-container"><canvas id="soldChart"></canvas></div>
+            </div>
+        </div>
+
+        <!-- Summary Table -->
+        <div class="table-card">
+            <h3>Market Summary by Price Range</h3>
+            <div id="tableContainer">
+                <div class="loading"><div class="spinner"></div>Loading...</div>
+            </div>
+        </div>
+
+        <!-- Price Range Drill-Down Panel (hidden until click) -->
+        <div class="drilldown-card" id="priceRangeListingsCard">
+            <div class="drilldown-header">
+                <h3 id="priceRangeListingsTitle">Listings</h3>
+                <button class="drilldown-close" onclick="closePriceRangePanel()">Close</button>
+            </div>
+            <div id="priceRangeListingsContainer"></div>
+        </div>
+
+        <!-- Monthly Volume Section -->
+        <div class="section-divider">
+            <h2><span>Monthly</span> Volume History</h2>
+        </div>
+
+        <div class="table-card volume-grid-wrapper">
+            <div class="volume-tabs">
+                <div class="volume-tab active" onclick="switchVolumeTab('sales')">Sales (Closed)</div>
+                <div class="volume-tab" onclick="switchVolumeTab('listings')">New Listings</div>
+                <div class="volume-tab" onclick="switchVolumeTab('inventory')">Active Inventory</div>
+            </div>
+            <div id="volumeGridContainer">
+                <div class="loading"><div class="spinner"></div>Loading volume data...</div>
+            </div>
+        </div>
+
+        <!-- Market Intelligence Section -->
+        <div class="section-divider">
+            <h2><span>Market</span> Intelligence — Hidden DOM</h2>
+        </div>
+
+        <!-- Hidden DOM KPIs -->
+        <div class="kpi-grid" id="hiddenKpiGrid">
+            <div class="loading"><div class="spinner"></div>Loading hidden DOM data...</div>
+        </div>
+
+        <!-- Hidden DOM Chart + Table -->
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h3>Reported DOM vs Actual DOM by Price Range</h3>
+                <div class="chart-container"><canvas id="hiddenDomChart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <h3>% Listings with Hidden Market Time</h3>
+                <div class="chart-container"><canvas id="hiddenPctChart"></canvas></div>
+            </div>
+        </div>
+
+        <div class="table-card" style="margin-bottom: 28px">
+            <h3>Withdrawal Matrix — Hidden Market Time by Price Range</h3>
+            <div id="hiddenTableContainer">
+                <div class="loading"><div class="spinner"></div>Loading...</div>
+            </div>
+        </div>
+
+        <!-- Agent Section -->
+        <div class="section-divider">
+            <h2><span>Agent</span> Intelligence</h2>
+        </div>
+
+        <!-- Agent Search -->
+        <div class="agent-search-bar">
+            <input type="text" id="agentSearch" placeholder="Search agent by name..." onkeydown="if(event.key==='Enter') searchAgent()">
+            <button class="btn btn-gold" onclick="searchAgent()">Search</button>
+            <button class="btn btn-outline" onclick="clearAgentSearch()" style="display:none" id="clearAgentBtn">Clear</button>
+        </div>
+
+        <!-- Agent Detail Panel (hidden until search) -->
+        <div class="agent-detail" id="agentDetail"></div>
+
+        <!-- Agent Listings Table (hidden until search) -->
+        <div class="table-card" id="agentListingsCard" style="display:none; margin-bottom:20px">
+            <h3 id="agentListingsTitle">Agent Listings</h3>
+            <div id="agentListingsContainer"></div>
+        </div>
+
+        <!-- Top Agents -->
+        <div class="table-card">
+            <h3 id="topAgentsTitle">Top Agents by Active Listings</h3>
+            <div id="topAgentsContainer">
+                <div class="loading"><div class="spinner"></div>Loading agents...</div>
+            </div>
+        </div>
+
+        <!-- Property Section -->
+        <div class="section-divider">
+            <h2><span>Property</span> Intelligence</h2>
+        </div>
+
+        <div class="agent-search-bar">
+            <input type="text" id="propertySearch" placeholder="Search by address (e.g. 9725 Starlight)..." onkeydown="if(event.key==='Enter') searchProperty()">
+            <button class="btn btn-gold" onclick="searchProperty()">Search</button>
+            <button class="btn btn-outline" onclick="clearPropertySearch()" style="display:none" id="clearPropBtn">Clear</button>
+        </div>
+
+        <!-- Property Detail (hidden until search) -->
+        <div class="agent-detail" id="propertyDetail"></div>
+
+        <!-- Property Listing History (hidden until search) -->
+        <div class="table-card" id="propertyHistoryCard" style="display:none; margin-bottom:20px">
+            <h3 id="propertyHistoryTitle">Listing History</h3>
+            <div id="propertyHistoryContainer"></div>
+        </div>
+    </div>
+    </div><!-- /app-wrapper -->
+
+    <script>
+        // =====================================================================
+        // Supabase connection (anon key — read-only, safe for local file)
+        // =====================================================================
+        const SUPABASE_URL = 'https://eyyhgnmawyqfrhavuzks.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhnbm1hd3lxZnJoYXZ1emtzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxOTcxMzMsImV4cCI6MjA4NTc3MzEzM30.fpnSrqNqMLNPvuFId9lv_VbC-38kYi0igVYHU9fYzkM';
+
+        const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Chart instances (for cleanup on reload)
+        let activeChart = null;
+        let soldChart = null;
+        let hiddenDomChart = null;
+        let hiddenPctChart = null;
+
+        // Monthly volume grid state
+        let volumeSalesData = null;
+        let volumeListingsData = null;
+        let volumeInventoryData = null;
+        let currentVolumeTab = 'sales';
+
+        // Global sales data for market comparison in agent listings
+        let salesByRange = {};
+
+        // Global trend data
+        let activeTrendByRange = {};
+        let salesTrendByRange = {};
+
+        // Price range drill-down state
+        const PRICE_RANGE_BOUNDS = {
+            '< $500K':       [0, 500000],
+            '$500K-$750K':   [500000, 750000],
+            '$750K-$1M':     [750000, 1000000],
+            '$1M-$1.5M':     [1000000, 1500000],
+            '$1.5M-$2M':     [1500000, 2000000],
+            '$2M-$3M':       [2000000, 3000000],
+            '$3M-$5M':       [3000000, 5000000],
+            '$5M+':          [5000000, 999999999]
+        };
+        let priceRangePage = 0;
+        const priceRangePageSize = 50;
+        let priceRangeTotalCount = 0;
+        let currentDrilldownRange = '';
+        let currentDrilldownStatus = '';
+
+        // Agent pagination state
+        let agentPage = 0;
+        const agentPageSize = 10;
+        let agentTotalCount = 0;
+
+        // Agent listings pagination (client-side)
+        let agentListingsData = [];
+        let agentListingsPage = 0;
+        const agentListingsPageSize = 10;
+
+        // Property history pagination (client-side)
+        let propHistoryData = [];
+        let propHistorySqft = 0;
+        let propHistoryPage = 0;
+        const propHistoryPageSize = 10;
+
+        // Determine which price range a price falls into
+        function getPriceRange(price) {
+            if (price < 500000) return '< $500K';
+            if (price < 750000) return '$500K-$750K';
+            if (price < 1000000) return '$750K-$1M';
+            if (price < 1500000) return '$1M-$1.5M';
+            if (price < 2000000) return '$1.5M-$2M';
+            if (price < 3000000) return '$2M-$3M';
+            if (price < 5000000) return '$3M-$5M';
+            return '$5M+';
+        }
+
+        // =====================================================================
+        // Formatting helpers
+        // =====================================================================
+        function fmt$(n) {
+            if (n == null) return '—';
+            if (n >= 1000000) return '$' + (n / 1000000).toFixed(1) + 'M';
+            if (n >= 1000) return '$' + Math.round(n / 1000) + 'K';
+            return '$' + Math.round(n);
+        }
+
+        function fmtN(n) {
+            if (n == null) return '—';
+            return Number(n).toLocaleString();
+        }
+
+        function fmtPct(n) {
+            if (n == null || n > 200 || n < 50) return '—';
+            return Number(n).toFixed(1) + '%';
+        }
+
+        function fmtDom(n) {
+            if (n == null) return '—';
+            return Math.round(Number(n));
+        }
+
+        function fmtHidden(cdom, dom) {
+            const c = Number(cdom || 0), d = Number(dom || 0);
+            const hidden = Math.round(c - d);
+            if (hidden <= 0) return '<span style="color:var(--gray-400)">0</span>';
+            return `<span style="color:var(--red); font-weight:600">+${hidden}</span>`;
+        }
+
+        function fmtDiscount(soldToListPct) {
+            if (soldToListPct == null || soldToListPct > 200 || soldToListPct < 50) return '—';
+            const discount = 100 - Number(soldToListPct);
+            return discount.toFixed(1) + '%';
+        }
+
+        function discountColor(soldToListPct) {
+            if (soldToListPct == null || soldToListPct > 200 || soldToListPct < 50) return '';
+            const discount = 100 - Number(soldToListPct);
+            if (discount > 0) return 'color: var(--red); font-weight: 600;';
+            if (discount < 0) return 'color: var(--green); font-weight: 600;';
+            return '';
+        }
+
+        // =====================================================================
+        // Set default date range — end date will be capped to last import
+        // =====================================================================
+        function initDates() {
+            const end = new Date();
+            const start = new Date();
+            start.setMonth(start.getMonth() - 6);
+            document.getElementById('endDate').value = end.toISOString().split('T')[0];
+            document.getElementById('startDate').value = start.toISOString().split('T')[0];
+        }
+
+        // Cap end date to last import and show staleness
+        function applyFreshness(lastUpdate) {
+            const now = new Date();
+            const diffMs = now - lastUpdate;
+            const daysOld = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+            const hoursOld = Math.floor(diffMs / (1000 * 60 * 60));
+
+            // Cap end date to last import date
+            const lastDateStr = lastUpdate.toISOString().split('T')[0];
+            const endInput = document.getElementById('endDate');
+            if (endInput.value > lastDateStr) {
+                endInput.value = lastDateStr;
+            }
+
+            // Cap start date 6 months before the capped end date
+            const cappedEnd = new Date(endInput.value + 'T00:00:00');
+            const startDefault = new Date(cappedEnd);
+            startDefault.setMonth(startDefault.getMonth() - 6);
+            const startInput = document.getElementById('startDate');
+            if (startInput.value > lastDateStr) {
+                startInput.value = startDefault.toISOString().split('T')[0];
+            }
+
+            // Staleness label
+            let ageText, ageClass;
+            if (daysOld === 0) {
+                ageText = hoursOld === 0 ? 'just now' : hoursOld + 'h ago';
+                ageClass = 'fresh';
+            } else if (daysOld === 1) {
+                ageText = 'yesterday';
+                ageClass = 'fresh';
+            } else if (daysOld <= 3) {
+                ageText = daysOld + ' days ago';
+                ageClass = 'stale-warn';
+            } else {
+                ageText = daysOld + ' days ago';
+                ageClass = 'stale-danger';
+            }
+
+            const dateFormatted = lastUpdate.toLocaleDateString('en-US', {
+                weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+                hour: 'numeric', minute: '2-digit'
+            });
+
+            const el = document.getElementById('headerFreshness');
+            el.innerHTML = 'Last MLS Import: <strong>' + dateFormatted + '</strong> <span class="freshness-badge ' + ageClass + '">' + ageText + '</span>';
+        }
+
+        // =====================================================================
+        // Load data from Supabase RPC
+        // =====================================================================
+        async function loadData() {
+            try {
+                // First, fetch freshness to cap dates before querying
+                const freshnessRes = await sb.from('listings')
+                    .select('updated_at')
+                    .order('updated_at', { ascending: false })
+                    .limit(1);
+
+                // Cap date pickers to last import date
+                if (freshnessRes.data && freshnessRes.data.length > 0) {
+                    const lastUpdate = new Date(freshnessRes.data[0].updated_at);
+                    applyFreshness(lastUpdate);
+                } else {
+                    document.getElementById('headerFreshness').innerHTML =
+                        'Last MLS Import: <strong>No data</strong> <span class="freshness-badge stale-danger">no imports</span>';
+                }
+
+                // Now read the (possibly capped) dates
+                const startDate = document.getElementById('startDate').value;
+                const endDate = document.getElementById('endDate').value;
+
+                const [activeRes, salesRes, hiddenRes, activeTrendRes, salesTrendRes] = await Promise.all([
+                    sb.rpc('get_active_summary'),
+                    sb.rpc('get_sales_summary', {
+                        p_start_date: startDate,
+                        p_end_date: endDate
+                    }),
+                    sb.rpc('get_hidden_dom_summary'),
+                    sb.rpc('get_active_trend'),
+                    sb.rpc('get_sales_trend', {
+                        p_start_date: startDate,
+                        p_end_date: endDate
+                    })
+                ]);
+
+                if (activeRes.error) throw activeRes.error;
+                if (salesRes.error) throw salesRes.error;
+
+                const active = activeRes.data;
+                const sales = salesRes.data;
+                const hidden = hiddenRes.error ? [] : (hiddenRes.data || []);
+                const activeTrend = activeTrendRes.error ? [] : (activeTrendRes.data || []);
+                const salesTrend = salesTrendRes.error ? [] : (salesTrendRes.data || []);
+
+                // Store sales data globally for agent market comparison
+                salesByRange = {};
+                sales.forEach(r => salesByRange[r.price_range] = r);
+
+                // Store trend data globally for summary table
+                activeTrendByRange = {};
+                activeTrend.forEach(r => activeTrendByRange[r.price_range] = r);
+                salesTrendByRange = {};
+                salesTrend.forEach(r => salesTrendByRange[r.price_range] = r);
+
+                // Sales window sub-bar
+                document.getElementById('freshness').textContent =
+                    'Sales window: ' + formatDateRange(startDate, endDate);
+
+                renderKPIs(active, sales);
+                renderCharts(active, sales);
+                renderTable(active, sales);
+                renderHiddenDom(hidden);
+                loadVolumeGrid();
+
+            } catch (err) {
+                console.error('Load error:', err);
+                document.getElementById('kpiGrid').innerHTML =
+                    '<div class="error-msg">Failed to load data: ' + err.message + '</div>';
+            }
+        }
+
+        function formatDateRange(start, end) {
+            const s = new Date(start + 'T00:00:00');
+            const e = new Date(end + 'T00:00:00');
+            const opts = { month: 'short', day: 'numeric', year: 'numeric' };
+            return s.toLocaleDateString('en-US', opts) + ' \u2013 ' + e.toLocaleDateString('en-US', opts);
+        }
+
+        // =====================================================================
+        // KPI Cards
+        // =====================================================================
+        function renderKPIs(active, sales) {
+            const totalActive = active.reduce((s, r) => s + Number(r.listing_count), 0);
+            const totalSold = sales.reduce((s, r) => s + Number(r.sold_count), 0);
+
+            // Weighted averages
+            const avgActivePrice = weightedAvg(active, 'avg_price', 'listing_count');
+            const avgActiveDom = weightedAvg(active, 'avg_dom', 'listing_count');
+            const avgSoldPrice = weightedAvg(sales, 'avg_sold_price', 'sold_count');
+            const avgSoldDom = weightedAvg(sales, 'avg_dom', 'sold_count');
+
+            const avgSoldToList = weightedAvg(sales, 'avg_sold_to_list_pct', 'sold_count');
+
+            const totalReductions = active.reduce((s, r) => s + Number(r.price_reduction_count), 0);
+            const reductionPct = totalActive > 0 ? ((totalReductions / totalActive) * 100).toFixed(1) : 0;
+
+            document.getElementById('kpiGrid').innerHTML = `
+                <div class="kpi-card highlight">
+                    <div class="kpi-label">Active Listings</div>
+                    <div class="kpi-value">${fmtN(totalActive)}</div>
+                    <div class="kpi-sub">${reductionPct}% with price reductions</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Avg Active Price</div>
+                    <div class="kpi-value">${fmt$(avgActivePrice)}</div>
+                    <div class="kpi-sub">Across all ranges</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Avg Active DOM</div>
+                    <div class="kpi-value">${fmtDom(avgActiveDom)}</div>
+                    <div class="kpi-sub">Days on market</div>
+                </div>
+                <div class="kpi-card highlight">
+                    <div class="kpi-label">Sold</div>
+                    <div class="kpi-value">${fmtN(totalSold)}</div>
+                    <div class="kpi-sub">In selected period</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Avg Sold Price</div>
+                    <div class="kpi-value">${fmt$(avgSoldPrice)}</div>
+                    <div class="kpi-sub">Avg DOM: ${fmtDom(avgSoldDom)}</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Avg Discount</div>
+                    <div class="kpi-value" style="${discountColor(avgSoldToList)}">${fmtDiscount(avgSoldToList)}</div>
+                    <div class="kpi-sub">Off list price (S/L: ${fmtPct(avgSoldToList)})</div>
+                </div>
+            `;
+        }
+
+        function weightedAvg(rows, valKey, weightKey) {
+            let totalVal = 0, totalWeight = 0;
+            for (const r of rows) {
+                const v = Number(r[valKey]);
+                const w = Number(r[weightKey]);
+                if (!isNaN(v) && w > 0) {
+                    totalVal += v * w;
+                    totalWeight += w;
+                }
+            }
+            return totalWeight > 0 ? totalVal / totalWeight : null;
+        }
+
+        // =====================================================================
+        // Charts
+        // =====================================================================
+        function renderCharts(active, sales) {
+            const labels = active.map(r => r.price_range);
+            const chartColors = {
+                navy: 'rgba(26, 35, 50, 0.85)',
+                navyBorder: '#1a2332',
+                gold: 'rgba(197, 165, 90, 0.85)',
+                goldBorder: '#c5a55a',
+            };
+
+            const commonOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#1a2332',
+                        titleColor: '#c5a55a',
+                        bodyColor: '#fff',
+                        padding: 10,
+                        cornerRadius: 6,
+                    },
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(0,0,0,0.04)' },
+                        ticks: { font: { size: 11 } },
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { size: 11 }, maxRotation: 45 },
+                    },
+                },
+            };
+
+            // Active chart
+            if (activeChart) activeChart.destroy();
+            activeChart = new Chart(document.getElementById('activeChart'), {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Active Listings',
+                        data: active.map(r => Number(r.listing_count)),
+                        backgroundColor: chartColors.navy,
+                        borderColor: chartColors.navyBorder,
+                        borderWidth: 1,
+                        borderRadius: 4,
+                    }],
+                },
+                options: {
+                    ...commonOptions,
+                    plugins: {
+                        ...commonOptions.plugins,
+                        tooltip: {
+                            ...commonOptions.plugins.tooltip,
+                            callbacks: {
+                                afterLabel: (ctx) => {
+                                    const r = active[ctx.dataIndex];
+                                    return `Avg: ${fmt$(Number(r.avg_price))}\nDOM: ${fmtDom(Number(r.avg_dom))}`;
+                                }
+                            }
+                        }
+                    }
+                },
+            });
+
+            // Sold chart — align labels to active labels
+            const salesMap = {};
+            sales.forEach(r => salesMap[r.price_range] = r);
+            const soldData = labels.map(l => salesMap[l] ? Number(salesMap[l].sold_count) : 0);
+
+            if (soldChart) soldChart.destroy();
+            soldChart = new Chart(document.getElementById('soldChart'), {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Sold',
+                        data: soldData,
+                        backgroundColor: chartColors.gold,
+                        borderColor: chartColors.goldBorder,
+                        borderWidth: 1,
+                        borderRadius: 4,
+                    }],
+                },
+                options: {
+                    ...commonOptions,
+                    plugins: {
+                        ...commonOptions.plugins,
+                        tooltip: {
+                            ...commonOptions.plugins.tooltip,
+                            callbacks: {
+                                afterLabel: (ctx) => {
+                                    const r = salesMap[labels[ctx.dataIndex]];
+                                    if (!r) return '';
+                                    return `Avg: ${fmt$(Number(r.avg_sold_price))}\nDOM: ${fmtDom(Number(r.avg_dom))}\nS/L: ${fmtPct(Number(r.avg_sold_to_list_pct))}`;
+                                }
+                            }
+                        }
+                    }
+                },
+            });
+        }
+
+        // =====================================================================
+        // Trend arrow helper
+        // type: 'inventory' = up is bad (red), down is good (green)
+        //       'sales'     = up is good (green), down is bad (red)
+        // =====================================================================
+        function trendArrow(trendData, type) {
+            if (!trendData) return '';
+            const change = Number(trendData.change_count);
+            const current = Number(trendData.current_count || 0);
+            const prior = Number(trendData.prior_count || 0);
+            if (change === 0) return '<span class="trend-flat">&#8212;</span>';
+            const isUp = change > 0;
+            // For inventory: up=red (more competition), down=green
+            // For sales: up=green (more demand), down=red
+            const colorClass = (type === 'sales') === isUp ? 'trend-good' : 'trend-bad';
+            const arrow = isUp ? '&#9650;' : '&#9660;';
+            return `<span class="${colorClass}"><span class="trend-arrow">${arrow}</span>${fmtN(Math.abs(change))}</span>`;
+        }
+
+        // =====================================================================
+        // Summary Table (with trend arrows)
+        // =====================================================================
+        function renderTable(active, sales) {
+            const salesMap = {};
+            sales.forEach(r => salesMap[r.price_range] = r);
+
+            let totalActive = 0, totalSold = 0;
+            let totalActiveChange = 0, totalSoldChange = 0;
+
+            let rows = active.map(r => {
+                const s = salesMap[r.price_range] || {};
+                const at = activeTrendByRange[r.price_range];
+                const st = salesTrendByRange[r.price_range];
+                totalActive += Number(r.listing_count);
+                totalSold += Number(s.sold_count || 0);
+                if (at) totalActiveChange += Number(at.change_count || 0);
+                if (st) totalSoldChange += Number(st.change_count || 0);
+                const rangeEsc = r.price_range.replace(/'/g, "\\'");
+                return `
+                <tr>
+                    <td><span class="clickable-count" onclick="loadPriceRangeListings('${rangeEsc}','active',0)">${r.price_range}</span></td>
+                    <td><span class="clickable-count" onclick="loadPriceRangeListings('${rangeEsc}','active',0)">${fmtN(r.listing_count)}</span> ${trendArrow(at, 'inventory')}</td>
+                    <td>${fmt$(Number(r.avg_price))}</td>
+                    <td>${fmt$(Number(r.avg_price_per_sqft))}</td>
+                    <td>${fmtDom(Number(r.avg_dom))}</td>
+                    <td>${fmtHidden(r.avg_cdom, r.avg_dom)}</td>
+                    <td>${fmtN(r.price_reduction_count)}</td>
+                    <td style="border-left: 2px solid var(--gray-200)"><span class="clickable-count" onclick="loadPriceRangeListings('${rangeEsc}','sold',0)">${fmtN(s.sold_count || 0)}</span> ${trendArrow(st, 'sales')}</td>
+                    <td>${fmt$(Number(s.avg_sold_price || 0))}</td>
+                    <td>${fmt$(Number(s.avg_price_per_sqft || 0))}</td>
+                    <td>${fmtDom(Number(s.avg_dom))}</td>
+                    <td>${fmtHidden(s.avg_cdom, s.avg_dom)}</td>
+                    <td style="${discountColor(s.avg_sold_to_list_pct)}">${fmtDiscount(s.avg_sold_to_list_pct)}</td>
+                </tr>`;
+            }).join('');
+
+            // Inventory up = bad (red), Sales up = good (green)
+            const totalActiveTrend = totalActiveChange > 0
+                ? `<span class="trend-bad"><span class="trend-arrow">&#9650;</span>${fmtN(totalActiveChange)}</span>`
+                : totalActiveChange < 0
+                ? `<span class="trend-good"><span class="trend-arrow">&#9660;</span>${fmtN(Math.abs(totalActiveChange))}</span>`
+                : '';
+            const totalSoldTrend = totalSoldChange > 0
+                ? `<span class="trend-good"><span class="trend-arrow">&#9650;</span>${fmtN(totalSoldChange)}</span>`
+                : totalSoldChange < 0
+                ? `<span class="trend-bad"><span class="trend-arrow">&#9660;</span>${fmtN(Math.abs(totalSoldChange))}</span>`
+                : '';
+
+            document.getElementById('tableContainer').innerHTML = `
+            <table>
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th class="section-active" colspan="6" style="text-align:center; border-bottom: 2px solid var(--navy)">Active Inventory</th>
+                        <th class="section-sold" colspan="6" style="text-align:center; border-left: 2px solid var(--gray-200); border-bottom: 2px solid var(--gold)">Sold</th>
+                    </tr>
+                    <tr>
+                        <th>Price Range</th>
+                        <th class="section-active">Count</th>
+                        <th class="section-active">Avg Price</th>
+                        <th class="section-active">$/SqFt</th>
+                        <th class="section-active">Avg DOM</th>
+                        <th class="section-active">Hidden</th>
+                        <th class="section-active">Reductions</th>
+                        <th class="section-sold" style="border-left: 2px solid var(--gray-200)">Count</th>
+                        <th class="section-sold">Avg Price</th>
+                        <th class="section-sold">$/SqFt</th>
+                        <th class="section-sold">Avg DOM</th>
+                        <th class="section-sold">Hidden</th>
+                        <th class="section-sold">Discount</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+                <tfoot>
+                    <tr>
+                        <td>Total</td>
+                        <td>${fmtN(totalActive)} ${totalActiveTrend}</td>
+                        <td colspan="5"></td>
+                        <td style="border-left: 2px solid var(--gray-200)">${fmtN(totalSold)} ${totalSoldTrend}</td>
+                        <td colspan="5"></td>
+                    </tr>
+                </tfoot>
+            </table>
+            <div style="font-size:11px; color:var(--gray-400); margin-top:6px">
+                <span class="trend-bad">&#9650;</span> Active up = more competition &nbsp;
+                <span class="trend-good">&#9650;</span> Sales up = more demand &nbsp;
+                (Trends: year-over-year) &nbsp;
+                <span style="color:var(--red); font-weight:600">Hidden</span> = avg additional days from prior withdrawn listings (CDOM − DOM)
+            </div>`;
+        }
+
+        // =====================================================================
+        // Hidden DOM / Withdrawal Matrix
+        // =====================================================================
+        function renderHiddenDom(data) {
+            if (!data || data.length === 0) {
+                document.getElementById('hiddenKpiGrid').innerHTML =
+                    '<div style="padding:20px; color:var(--gray-400)">No hidden DOM data available</div>';
+                document.getElementById('hiddenTableContainer').innerHTML = '';
+                return;
+            }
+
+            // KPI calculations
+            const totalActive = data.reduce((s, r) => s + Number(r.total_active), 0);
+            const totalHidden = data.reduce((s, r) => s + Number(r.hidden_count), 0);
+            const hiddenPct = totalActive > 0 ? (totalHidden / totalActive * 100).toFixed(1) : 0;
+
+            // Weighted avg reported DOM (all active)
+            const wAvgReported = data.reduce((s, r) => s + Number(r.avg_reported_dom || 0) * Number(r.total_active), 0) / totalActive;
+            // Weighted avg actual DOM (hidden only)
+            const wAvgActual = totalHidden > 0
+                ? data.reduce((s, r) => s + Number(r.avg_actual_dom || 0) * Number(r.hidden_count), 0) / totalHidden
+                : 0;
+            const maxActual = Math.max(...data.map(r => Number(r.max_actual_dom || 0)));
+
+            document.getElementById('hiddenKpiGrid').innerHTML = `
+                <div class="kpi-card highlight">
+                    <div class="kpi-label">Hidden Market Time</div>
+                    <div class="kpi-value">${hiddenPct}%</div>
+                    <div class="kpi-sub">${fmtN(totalHidden)} of ${fmtN(totalActive)} active listings</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Avg Reported DOM</div>
+                    <div class="kpi-value">${Math.round(wAvgReported)}</div>
+                    <div class="kpi-sub">What MLS shows</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Avg Actual DOM</div>
+                    <div class="kpi-value" style="color:var(--red)">${Math.round(wAvgActual)}</div>
+                    <div class="kpi-sub">Hidden listings only</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Max Actual DOM</div>
+                    <div class="kpi-value">${fmtN(maxActual)}</div>
+                    <div class="kpi-sub">Longest hidden time</div>
+                </div>
+            `;
+
+            // Charts
+            const labels = data.map(r => r.price_range);
+            const reportedDoms = data.map(r => Number(r.avg_reported_dom || 0));
+            const actualDoms = data.map(r => Number(r.avg_actual_dom || 0));
+            const hiddenPcts = data.map(r => Number(r.hidden_pct || 0));
+
+            const commonOpts = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top', labels: { font: { size: 11 } } },
+                    tooltip: {
+                        backgroundColor: '#1a2332',
+                        titleColor: '#c5a55a',
+                        bodyColor: '#fff',
+                        padding: 10,
+                        cornerRadius: 6,
+                    },
+                },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 11 } } },
+                    x: { grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 45 } },
+                },
+            };
+
+            if (hiddenDomChart) hiddenDomChart.destroy();
+            hiddenDomChart = new Chart(document.getElementById('hiddenDomChart'), {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Reported DOM',
+                            data: reportedDoms,
+                            backgroundColor: 'rgba(26, 35, 50, 0.85)',
+                            borderColor: '#1a2332',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                        },
+                        {
+                            label: 'Actual DOM (Hidden)',
+                            data: actualDoms,
+                            backgroundColor: 'rgba(239, 68, 68, 0.7)',
+                            borderColor: '#ef4444',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                        }
+                    ],
+                },
+                options: commonOpts,
+            });
+
+            if (hiddenPctChart) hiddenPctChart.destroy();
+            hiddenPctChart = new Chart(document.getElementById('hiddenPctChart'), {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: '% with Hidden Time',
+                        data: hiddenPcts,
+                        backgroundColor: hiddenPcts.map(p =>
+                            p > 35 ? 'rgba(239, 68, 68, 0.8)' :
+                            p > 25 ? 'rgba(245, 158, 11, 0.8)' :
+                            'rgba(197, 165, 90, 0.8)'
+                        ),
+                        borderColor: hiddenPcts.map(p =>
+                            p > 35 ? '#ef4444' : p > 25 ? '#f59e0b' : '#c5a55a'
+                        ),
+                        borderWidth: 1,
+                        borderRadius: 4,
+                    }],
+                },
+                options: {
+                    ...commonOpts,
+                    plugins: {
+                        ...commonOpts.plugins,
+                        legend: { display: false },
+                    },
+                    scales: {
+                        ...commonOpts.scales,
+                        y: {
+                            ...commonOpts.scales.y,
+                            ticks: { ...commonOpts.scales.y.ticks, callback: v => v + '%' },
+                        },
+                    },
+                },
+            });
+
+            // Withdrawal matrix table
+            let rows = data.map(r => {
+                const reported = Number(r.avg_reported_dom || 0);
+                const actual = Number(r.avg_actual_dom || 0);
+                const maxDom = actual > 0 ? actual : 1;
+                const reportedWidth = Math.round(reported / maxDom * 80);
+                const actualWidth = 80;
+
+                return `
+                <tr>
+                    <td>${r.price_range}</td>
+                    <td>${fmtN(r.total_active)}</td>
+                    <td>${fmtN(r.hidden_count)}</td>
+                    <td><span class="hidden-pct-badge">${r.hidden_pct}%</span></td>
+                    <td>${Math.round(reported)}</td>
+                    <td style="color:var(--red); font-weight:600">${actual > 0 ? Math.round(actual) : '—'}</td>
+                    <td>
+                        <div class="hidden-bar-container">
+                            <div class="hidden-bar reported" style="width:${reportedWidth}px" title="Reported: ${Math.round(reported)} days"></div>
+                            <div class="hidden-bar actual" style="width:${actualWidth}px" title="Actual: ${Math.round(actual)} days"></div>
+                        </div>
+                    </td>
+                    <td>${r.avg_understatement_pct != null ? r.avg_understatement_pct + '%' : '—'}</td>
+                    <td>${r.max_actual_dom || '—'}</td>
+                    <td>${r.avg_prior_listings || '—'}</td>
+                </tr>`;
+            }).join('');
+
+            document.getElementById('hiddenTableContainer').innerHTML = `
+            <table>
+                <thead>
+                    <tr>
+                        <th style="text-align:left">Price Range</th>
+                        <th>Active</th>
+                        <th>Hidden</th>
+                        <th>% Hidden</th>
+                        <th>Reported DOM</th>
+                        <th>Actual DOM</th>
+                        <th style="text-align:left; min-width:180px">Visual</th>
+                        <th>Understatement</th>
+                        <th>Max Actual</th>
+                        <th>Avg Prior</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+            <div style="font-size:11px; color:var(--gray-400); margin-top:8px">
+                Hidden Market Time = listings where the same property had a prior withdrawn/expired listing within 90 days (DOM reset).
+                Actual DOM = days since earliest linked listing on same parcel.
+                <span class="hidden-bar reported" style="width:12px; height:10px; display:inline-block; vertical-align:middle"></span> Reported &nbsp;
+                <span class="hidden-bar actual" style="width:12px; height:10px; display:inline-block; vertical-align:middle"></span> Actual
+            </div>`;
+        }
+
+        // =====================================================================
+        // Price Range Drill-Down
+        // =====================================================================
+        function redfinUrl(address, city) {
+            const q = encodeURIComponent((address || '') + ', ' + (city || 'Las Vegas') + ', NV');
+            return 'https://www.redfin.com/search#query=' + q;
+        }
+
+        async function loadPriceRangeListings(rangeLabel, statusType, page) {
+            currentDrilldownRange = rangeLabel;
+            currentDrilldownStatus = statusType;
+            priceRangePage = page;
+
+            const bounds = PRICE_RANGE_BOUNDS[rangeLabel];
+            if (!bounds) return;
+
+            const card = document.getElementById('priceRangeListingsCard');
+            card.classList.add('visible');
+            document.getElementById('priceRangeListingsTitle').textContent =
+                rangeLabel + ' — ' + (statusType === 'active' ? 'Active Listings' : 'Sold Listings') + ' (loading...)';
+            document.getElementById('priceRangeListingsContainer').innerHTML =
+                '<div class="loading"><div class="spinner"></div>Loading listings...</div>';
+
+            card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+
+            try {
+                const { data, error } = await sb.rpc('get_listings_by_price_range', {
+                    p_min_price: bounds[0],
+                    p_max_price: bounds[1],
+                    p_status_type: statusType,
+                    p_start_date: startDate,
+                    p_end_date: endDate,
+                    p_limit: priceRangePageSize,
+                    p_offset: page * priceRangePageSize
+                });
+                if (error) throw error;
+
+                priceRangeTotalCount = (data && data.length > 0) ? Number(data[0].total_count) : 0;
+                document.getElementById('priceRangeListingsTitle').textContent =
+                    rangeLabel + ' — ' + (statusType === 'active' ? 'Active' : 'Sold') +
+                    ' (' + fmtN(priceRangeTotalCount) + ' listings)';
+                renderPriceRangeListings(data, statusType, rangeLabel);
+            } catch (err) {
+                document.getElementById('priceRangeListingsContainer').innerHTML =
+                    '<div class="error-msg">Failed to load listings: ' + err.message + '</div>';
+            }
+        }
+
+        function renderPriceRangeListings(listings, statusType, rangeLabel) {
+            if (!listings || listings.length === 0) {
+                document.getElementById('priceRangeListingsContainer').innerHTML =
+                    '<div style="padding:20px; color:var(--gray-400); text-align:center">No listings found</div>';
+                return;
+            }
+
+            const mktData = salesByRange[rangeLabel];
+            const mktPpsf = mktData ? Number(mktData.avg_price_per_sqft) : null;
+
+            const rows = listings.map(l => {
+                const price = (statusType === 'sold' && l.sold_price)
+                    ? fmtPrice(l.sold_price)
+                    : fmtPrice(l.current_price);
+
+                const ppsf = l.price_per_sqft ? Number(l.price_per_sqft) : null;
+                let vsMktHtml = '—';
+                if (ppsf && mktPpsf) {
+                    const diff = Math.round(ppsf - mktPpsf);
+                    const cls = diff > 5 ? 'over-market' : diff < -5 ? 'under-market' : 'at-market';
+                    const sign = diff > 0 ? '+' : '';
+                    vsMktHtml = '<span class="' + cls + '">' + sign + '$' + diff + '/sf</span>';
+                }
+
+                // Hidden time display
+                let hiddenHtml = '—';
+                if (l.actual_dom != null) {
+                    const mult = l.dom > 0 ? (l.actual_dom / l.dom).toFixed(1) : '?';
+                    hiddenHtml = '<span style="color:var(--red); font-weight:600">' + l.actual_dom + 'd</span>'
+                        + ' <span class="hidden-pct-badge">' + mult + 'x</span>';
+                }
+
+                return `
+                <tr>
+                    <td style="text-align:left">${statusBadge(l.status)}</td>
+                    <td style="text-align:left"><a class="redfin-link" href="${redfinUrl(l.address, l.city)}" target="_blank" title="View on Redfin">${l.address || '—'}</a></td>
+                    <td><a class="mls-link" href="https://www.google.com/search?q=MLS+${l.mls_number}+Las+Vegas+NV" target="_blank">${l.mls_number}</a></td>
+                    <td>${price}</td>
+                    <td>${ppsf ? '$' + Math.round(ppsf) : '—'}</td>
+                    <td>${vsMktHtml}</td>
+                    <td>${l.beds || '—'}/${l.baths || '—'}</td>
+                    <td>${fmtN(l.sqft)}</td>
+                    <td>${l.dom != null ? l.dom : '—'}</td>
+                    <td>${hiddenHtml}</td>
+                    <td>${fmtDate(l.list_date)}</td>
+                    <td>${fmtDate(l.close_date)}</td>
+                    <td style="text-align:left">${l.list_agent_name || '—'}</td>
+                </tr>`;
+            }).join('');
+
+            const totalPages = Math.ceil(priceRangeTotalCount / priceRangePageSize);
+            const currentPage = priceRangePage + 1;
+            const showing = priceRangePage * priceRangePageSize + 1;
+            const showingEnd = Math.min((priceRangePage + 1) * priceRangePageSize, priceRangeTotalCount);
+
+            document.getElementById('priceRangeListingsContainer').innerHTML = `
+            <table>
+                <thead>
+                    <tr>
+                        <th style="text-align:left">Status</th>
+                        <th style="text-align:left">Address</th>
+                        <th>MLS#</th>
+                        <th>Price</th>
+                        <th>$/SqFt</th>
+                        <th>vs Mkt</th>
+                        <th>Bd/Ba</th>
+                        <th>SqFt</th>
+                        <th>DOM</th>
+                        <th>Hidden</th>
+                        <th>Listed</th>
+                        <th>Closed</th>
+                        <th style="text-align:left">Agent</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+            <div class="pagination">
+                <button class="btn btn-outline" onclick="loadPriceRangeListings('${currentDrilldownRange.replace(/'/g, "\\'")}','${currentDrilldownStatus}',${priceRangePage - 1})" ${priceRangePage === 0 ? 'disabled' : ''}>Prev</button>
+                <span>Showing ${fmtN(showing)}\u2013${fmtN(showingEnd)} of ${fmtN(priceRangeTotalCount)} &nbsp; (Page ${currentPage} of ${totalPages})</span>
+                <button class="btn btn-outline" onclick="loadPriceRangeListings('${currentDrilldownRange.replace(/'/g, "\\'")}','${currentDrilldownStatus}',${priceRangePage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}>Next</button>
+            </div>
+            <div style="font-size:11px; color:var(--gray-400); margin-top:6px">
+                Addresses link to Redfin. MLS# links to Google.
+                <span class="over-market">Red = over market avg</span> &nbsp;
+                <span class="under-market">Green = under market avg</span> &nbsp;
+                Hidden = actual days on market from prior withdrawn/expired listing on same parcel (multiplier vs reported DOM)
+            </div>`;
+        }
+
+        function closePriceRangePanel() {
+            document.getElementById('priceRangeListingsCard').classList.remove('visible');
+        }
+
+        // =====================================================================
+        // Agent: Top Agents
+        // =====================================================================
+        async function loadTopAgents(page) {
+            if (page !== undefined) agentPage = page;
+            const offset = agentPage * agentPageSize;
+            try {
+                const { data, error } = await sb.rpc('get_top_agents', {
+                    p_limit: agentPageSize,
+                    p_offset: offset
+                });
+                if (error) throw error;
+                if (data && data.length > 0) {
+                    agentTotalCount = Number(data[0].total_agents);
+                }
+                renderTopAgents(data, offset);
+            } catch (err) {
+                document.getElementById('topAgentsContainer').innerHTML =
+                    '<div class="error-msg">Failed to load top agents: ' + err.message + '</div>';
+            }
+        }
+
+        function renderTopAgents(agents, offset) {
+            const rows = agents.map((a, i) => `
+                <tr class="clickable" onclick="searchAgentByName('${a.agent_name.replace(/'/g, "\\'")}')">
+                    <td class="rank-cell">${offset + i + 1}</td>
+                    <td>${a.agent_name}</td>
+                    <td>${a.office_name || '—'}</td>
+                    <td>${fmtN(a.active_count)}</td>
+                    <td>${fmt$(Number(a.active_volume))}</td>
+                    <td>${fmt$(Number(a.avg_price))}</td>
+                    <td>${fmtDom(Number(a.avg_dom))}</td>
+                    <td style="border-left: 2px solid var(--gray-200)">${fmtN(a.sold_count)}</td>
+                    <td>${fmt$(Number(a.sold_volume))}</td>
+                </tr>
+            `).join('');
+
+            const totalPages = Math.ceil(agentTotalCount / agentPageSize);
+            const currentPage = agentPage + 1;
+
+            document.getElementById('topAgentsTitle').textContent =
+                'Top Agents by Active Listings (' + fmtN(agentTotalCount) + ' total)';
+
+            document.getElementById('topAgentsContainer').innerHTML = `
+            <table>
+                <thead>
+                    <tr>
+                        <th style="text-align:center">#</th>
+                        <th style="text-align:left">Agent</th>
+                        <th style="text-align:left">Office</th>
+                        <th class="section-active">Active</th>
+                        <th class="section-active">Volume</th>
+                        <th class="section-active">Avg Price</th>
+                        <th class="section-active">Avg DOM</th>
+                        <th class="section-sold" style="border-left: 2px solid var(--gray-200)">Sold (6mo)</th>
+                        <th class="section-sold">Sold Vol</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+            <div class="pagination">
+                <button class="btn btn-outline" onclick="loadTopAgents(${agentPage - 1})" ${agentPage === 0 ? 'disabled' : ''}>Prev</button>
+                <span>Page ${currentPage} of ${totalPages}</span>
+                <button class="btn btn-outline" onclick="loadTopAgents(${agentPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}>Next</button>
+            </div>
+            <div style="font-size:11px; color:var(--gray-400); margin-top:8px">Click a row to view agent details</div>`;
+        }
+
+        // =====================================================================
+        // Agent: Search
+        // =====================================================================
+        function searchAgentByName(name) {
+            document.getElementById('agentSearch').value = name;
+            searchAgent();
+        }
+
+        async function searchAgent() {
+            const name = document.getElementById('agentSearch').value.trim();
+            if (!name) return;
+
+            document.getElementById('clearAgentBtn').style.display = '';
+            document.getElementById('agentListingsCard').style.display = 'block';
+            document.getElementById('agentListingsContainer').innerHTML =
+                '<div class="loading"><div class="spinner"></div>Searching...</div>';
+
+            try {
+                const { data, error } = await sb.rpc('search_agent_listings', { p_agent_name: name });
+                if (error) throw error;
+                if (!data || data.length === 0) {
+                    document.getElementById('agentDetail').className = 'agent-detail';
+                    document.getElementById('agentListingsContainer').innerHTML =
+                        '<div style="padding:20px; color:var(--gray-400); text-align:center">No listings found for "' + name + '"</div>';
+                    return;
+                }
+                renderAgentDetail(data);
+                renderAgentListings(data);
+            } catch (err) {
+                document.getElementById('agentListingsContainer').innerHTML =
+                    '<div class="error-msg">Search failed: ' + err.message + '</div>';
+            }
+        }
+
+        function clearAgentSearch() {
+            document.getElementById('agentSearch').value = '';
+            document.getElementById('clearAgentBtn').style.display = 'none';
+            document.getElementById('agentDetail').className = 'agent-detail';
+            document.getElementById('agentListingsCard').style.display = 'none';
+        }
+
+        function renderAgentDetail(listings) {
+            const activeListings = listings.filter(l => l.status.startsWith('A'));
+            const soldListings = listings.filter(l => l.status === 'S' || l.status === 'H');
+            const pendingListings = listings.filter(l => l.status === 'P' || l.status === 'US' || l.status === 'UNS');
+
+            const officeName = listings[0].list_office || '';
+            const totalActive = activeListings.length;
+            const totalSold = soldListings.length;
+            const totalPending = pendingListings.length;
+
+            const activeVol = activeListings.reduce((s, l) => s + Number(l.current_price || 0), 0);
+            const soldVol = soldListings.reduce((s, l) => s + Number(l.sold_price || l.current_price || 0), 0);
+            const avgDom = activeListings.length > 0
+                ? Math.round(activeListings.reduce((s, l) => s + (l.dom || 0), 0) / activeListings.length)
+                : '—';
+
+            // Get best phone/email from most recent listing
+            const phone = listings.find(l => l.agent_phone)?.agent_phone || '';
+            const email = listings.find(l => l.agent_email)?.agent_email || '';
+
+            let contactHtml = '';
+            if (phone || email) {
+                contactHtml = '<div class="contact-line">';
+                if (phone) contactHtml += '<a href="tel:' + phone + '">' + phone + '</a>';
+                if (phone && email) contactHtml += ' &nbsp;|&nbsp; ';
+                if (email) contactHtml += '<a href="mailto:' + email + '">' + email + '</a>';
+                contactHtml += '</div>';
+            }
+
+            const panel = document.getElementById('agentDetail');
+            panel.className = 'agent-detail visible';
+            panel.innerHTML = `
+                <div class="agent-detail-header">
+                    <div>
+                        <h3>${document.getElementById('agentSearch').value}</h3>
+                        <div class="office">${officeName}</div>
+                        ${contactHtml}
+                    </div>
+                    <div class="agent-kpis">
+                        <div class="agent-kpi">
+                            <div class="val">${totalActive}</div>
+                            <div class="lbl">Active</div>
+                        </div>
+                        <div class="agent-kpi">
+                            <div class="val">${totalPending}</div>
+                            <div class="lbl">Pending</div>
+                        </div>
+                        <div class="agent-kpi">
+                            <div class="val">${totalSold}</div>
+                            <div class="lbl">Sold</div>
+                        </div>
+                        <div class="agent-kpi">
+                            <div class="val">${fmt$(activeVol)}</div>
+                            <div class="lbl">Active Vol</div>
+                        </div>
+                        <div class="agent-kpi">
+                            <div class="val">${fmt$(soldVol)}</div>
+                            <div class="lbl">Sold Vol</div>
+                        </div>
+                        <div class="agent-kpi">
+                            <div class="val">${avgDom}</div>
+                            <div class="lbl">Avg DOM</div>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        function statusBadge(status) {
+            if (status.startsWith('A')) return '<span class="status-badge status-active">Active</span>';
+            if (status === 'P' || status === 'US' || status === 'UNS') return '<span class="status-badge status-pending">Pending</span>';
+            if (status === 'S' || status === 'H') return '<span class="status-badge status-sold">Sold</span>';
+            return '<span class="status-badge status-other">' + status + '</span>';
+        }
+
+        function fmtPrice(n) {
+            if (n == null || n == 0) return '—';
+            return '$' + Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
+        }
+
+        function fmtDate(d) {
+            if (!d) return '—';
+            return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+        }
+
+        function renderAgentListings(listings, page) {
+            agentListingsData = listings;
+            agentListingsPage = page || 0;
+
+            const total = listings.length;
+            const start = agentListingsPage * agentListingsPageSize;
+            const end = Math.min(start + agentListingsPageSize, total);
+            const pageListings = listings.slice(start, end);
+            const totalPages = Math.ceil(total / agentListingsPageSize);
+            const currentPage = agentListingsPage + 1;
+
+            document.getElementById('agentListingsTitle').textContent =
+                'Listings (' + total + (total === 100 ? '+ max' : '') + ')';
+
+            const rows = pageListings.map(l => {
+                const price = l.status === 'S' || l.status === 'H'
+                    ? fmtPrice(l.sold_price || l.current_price)
+                    : fmtPrice(l.current_price);
+
+                // Market comparison: listing $/sqft vs sold avg $/sqft for same price range
+                const listingPrice = Number(l.sold_price || l.current_price || 0);
+                const listingSqft = Number(l.sqft || 0);
+                const listingPpsf = listingSqft > 0 ? listingPrice / listingSqft : null;
+                const range = getPriceRange(listingPrice);
+                const mktData = salesByRange[range];
+                const mktPpsf = mktData ? Number(mktData.avg_price_per_sqft) : null;
+
+                let vsMktHtml = '<td>—</td><td>—</td>';
+                if (listingPpsf && mktPpsf && listingSqft > 0) {
+                    const diffPpsf = Math.round(listingPpsf - mktPpsf);
+                    const diffTotal = diffPpsf * listingSqft;
+                    const cls = diffPpsf > 5 ? 'over-market' : diffPpsf < -5 ? 'under-market' : 'at-market';
+                    const sign = diffPpsf > 0 ? '+' : '';
+                    vsMktHtml = `<td class="${cls}">${sign}$${diffPpsf}/sf</td>`
+                        + `<td class="${cls}">${sign}${fmt$(diffTotal)}</td>`;
+                }
+
+                return `
+                <tr>
+                    <td style="text-align:left">${statusBadge(l.status)}</td>
+                    <td style="text-align:left">${l.address || '—'}</td>
+                    <td style="text-align:left">${l.city || ''}</td>
+                    <td><a class="mls-link" href="https://www.google.com/search?q=MLS+${l.mls_number}+Las+Vegas+NV" target="_blank" title="Search MLS# on Google">${l.mls_number}</a></td>
+                    <td>${price}</td>
+                    <td>${fmt$(Number(l.price_per_sqft))}</td>
+                    ${vsMktHtml}
+                    <td>${l.beds || '—'}/${l.baths || '—'}</td>
+                    <td>${fmtN(l.sqft)}</td>
+                    <td>${l.dom != null ? l.dom : '—'}</td>
+                    <td>${fmtDate(l.list_date)}</td>
+                    <td>${fmtDate(l.close_date)}</td>
+                </tr>`;
+            }).join('');
+
+            document.getElementById('agentListingsContainer').innerHTML = `
+            <table>
+                <thead>
+                    <tr>
+                        <th style="text-align:left">Status</th>
+                        <th style="text-align:left">Address</th>
+                        <th style="text-align:left">City</th>
+                        <th>MLS#</th>
+                        <th>Price</th>
+                        <th>$/SqFt</th>
+                        <th>vs Mkt/sf</th>
+                        <th>Over/Under</th>
+                        <th>Bd/Ba</th>
+                        <th>SqFt</th>
+                        <th>DOM</th>
+                        <th>Listed</th>
+                        <th>Closed</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+            <div class="pagination">
+                <button class="btn btn-outline" onclick="renderAgentListings(agentListingsData,${agentListingsPage - 1})" ${agentListingsPage === 0 ? 'disabled' : ''}>Prev</button>
+                <span>Showing ${start + 1}\u2013${end} of ${total} &nbsp; (Page ${currentPage} of ${totalPages})</span>
+                <button class="btn btn-outline" onclick="renderAgentListings(agentListingsData,${agentListingsPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}>Next</button>
+            </div>`;
+        }
+
+        // =====================================================================
+        // Property Intelligence
+        // =====================================================================
+        async function searchProperty() {
+            const addr = document.getElementById('propertySearch').value.trim();
+            if (!addr) return;
+
+            document.getElementById('clearPropBtn').style.display = '';
+            document.getElementById('propertyHistoryCard').style.display = 'block';
+            document.getElementById('propertyHistoryContainer').innerHTML =
+                '<div class="loading"><div class="spinner"></div>Searching...</div>';
+
+            try {
+                const { data, error } = await sb.rpc('search_property', { p_address: addr });
+                if (error) throw error;
+                if (!data || data.length === 0) {
+                    document.getElementById('propertyDetail').className = 'agent-detail';
+                    document.getElementById('propertyHistoryContainer').innerHTML =
+                        '<div style="padding:20px; color:var(--gray-400); text-align:center">No properties found for "' + addr + '"</div>';
+                    return;
+                }
+
+                // Group by parcel_id
+                const parcels = {};
+                data.forEach(r => {
+                    if (!parcels[r.parcel_id]) parcels[r.parcel_id] = [];
+                    parcels[r.parcel_id].push(r);
+                });
+
+                const parcelIds = Object.keys(parcels);
+                if (parcelIds.length === 1) {
+                    showPropertyDetail(parcels[parcelIds[0]]);
+                } else {
+                    // Multiple properties — show picker
+                    showPropertyPicker(parcels);
+                }
+            } catch (err) {
+                document.getElementById('propertyHistoryContainer').innerHTML =
+                    '<div class="error-msg">Search failed: ' + err.message + '</div>';
+            }
+        }
+
+        function showPropertyPicker(parcels) {
+            const panel = document.getElementById('propertyDetail');
+            panel.className = 'agent-detail visible';
+
+            let items = '';
+            for (const [pid, rows] of Object.entries(parcels)) {
+                const p = rows[0];
+                const latest = rows.find(r => r.mls_number);
+                const statusLabel = latest ? statusBadge(latest.status) : '<span class="status-badge status-other">No Listings</span>';
+                const priceLabel = latest ? fmtPrice(latest.current_price) : '';
+                items += `
+                    <div class="prop-result-item" onclick="showPropertyDetail(propSearchResults['${pid}'])">
+                        <div>
+                            <div class="addr">${p.address}</div>
+                            <div class="meta">${p.city || ''} ${p.zip_code || ''} &bull; ${p.beds || '?'}bd/${p.baths || '?'}ba &bull; ${fmtN(p.sqft)} sqft</div>
+                        </div>
+                        <div style="text-align:right">
+                            ${statusLabel}
+                            <div class="meta">${priceLabel}</div>
+                        </div>
+                    </div>`;
+            }
+
+            // Store results globally for click handler
+            window.propSearchResults = parcels;
+
+            panel.innerHTML = `
+                <h3 style="margin-bottom:12px">${Object.keys(parcels).length} Properties Found</h3>
+                <div class="prop-results">${items}</div>`;
+
+            document.getElementById('propertyHistoryCard').style.display = 'none';
+        }
+
+        function showPropertyDetail(rows) {
+            const p = rows[0];
+            const panel = document.getElementById('propertyDetail');
+            panel.className = 'agent-detail visible';
+
+            // Current status from most recent listing
+            const latest = rows.find(r => r.mls_number);
+            const statusLabel = latest ? statusBadge(latest.status) : '<span class="status-badge status-other">No Active Listing</span>';
+            const currentPrice = latest ? fmtPrice(latest.current_price) : '—';
+
+            // Market comparison
+            let mktHtml = '';
+            if (latest && latest.current_price && p.sqft) {
+                const ppsf = Number(latest.current_price) / Number(p.sqft);
+                const range = getPriceRange(Number(latest.current_price));
+                const mkt = salesByRange[range];
+                if (mkt) {
+                    const mktPpsf = Number(mkt.avg_price_per_sqft);
+                    const diff = Math.round(ppsf - mktPpsf);
+                    const diffTotal = diff * Number(p.sqft);
+                    const cls = diff > 5 ? 'over-market' : diff < -5 ? 'under-market' : 'at-market';
+                    const sign = diff > 0 ? '+' : '';
+                    mktHtml = `<div class="contact-line">vs Market: <span class="${cls}">${sign}$${diff}/sf (${sign}${fmt$(diffTotal)})</span> &bull; Market avg: $${mktPpsf}/sf in ${range}</div>`;
+                }
+            }
+
+            // Agent contact from most recent listing
+            let agentHtml = '';
+            if (latest && latest.list_agent_name) {
+                agentHtml = `<div class="contact-line" style="margin-top:8px">
+                    <strong>Agent:</strong> ${latest.list_agent_name} &bull; ${latest.list_office_name || ''}`;
+                if (latest.list_agent_phone) agentHtml += ` &bull; <a href="tel:${latest.list_agent_phone}">${latest.list_agent_phone}</a>`;
+                if (latest.list_agent_email) agentHtml += ` &bull; <a href="mailto:${latest.list_agent_email}">${latest.list_agent_email}</a>`;
+                agentHtml += '</div>';
+            }
+
+            panel.innerHTML = `
+                <div class="agent-detail-header">
+                    <div>
+                        <h3>${p.address}</h3>
+                        <div class="office">${p.city || ''}, ${p.zip_code || ''} &bull; ${p.subdivision || ''}</div>
+                        <div class="contact-line">${statusLabel} &nbsp; ${currentPrice}</div>
+                        ${mktHtml}
+                        ${agentHtml}
+                    </div>
+                </div>
+                <div class="prop-specs">
+                    <div class="prop-spec"><div class="val">${p.beds || '—'}</div><div class="lbl">Beds</div></div>
+                    <div class="prop-spec"><div class="val">${p.baths || '—'}</div><div class="lbl">Baths</div></div>
+                    <div class="prop-spec"><div class="val">${fmtN(p.sqft)}</div><div class="lbl">SqFt</div></div>
+                    <div class="prop-spec"><div class="val">${fmtN(p.lot_sqft)}</div><div class="lbl">Lot SqFt</div></div>
+                    <div class="prop-spec"><div class="val">${p.year_built || '—'}</div><div class="lbl">Built</div></div>
+                    <div class="prop-spec"><div class="val">${p.pool ? 'Yes' : 'No'}</div><div class="lbl">Pool</div></div>
+                    <div class="prop-spec"><div class="val">${p.garage_spaces || '—'}</div><div class="lbl">Garage</div></div>
+                    <div class="prop-spec"><div class="val">${p.property_type || '—'}</div><div class="lbl">Type</div></div>
+                </div>`;
+
+            // Show listing history
+            const listingRows = rows.filter(r => r.mls_number);
+            if (listingRows.length === 0) {
+                document.getElementById('propertyHistoryCard').style.display = 'block';
+                document.getElementById('propertyHistoryContainer').innerHTML =
+                    '<div style="padding:20px; color:var(--gray-400); text-align:center">No listing history found</div>';
+                return;
+            }
+
+            document.getElementById('propertyHistoryCard').style.display = 'block';
+            propHistoryData = listingRows;
+            propHistorySqft = Number(p.sqft || 0);
+            renderPropertyHistory(0);
+        }
+
+        function renderPropertyHistory(page) {
+            propHistoryPage = page;
+            const total = propHistoryData.length;
+            const start = propHistoryPage * propHistoryPageSize;
+            const end = Math.min(start + propHistoryPageSize, total);
+            const pageListings = propHistoryData.slice(start, end);
+            const totalPages = Math.ceil(total / propHistoryPageSize);
+            const currentPage = propHistoryPage + 1;
+
+            document.getElementById('propertyHistoryTitle').textContent = 'Listing History (' + total + ')';
+
+            const histRows = pageListings.map(l => {
+                const price = l.status === 'S' || l.status === 'H'
+                    ? fmtPrice(l.sold_price || l.current_price)
+                    : fmtPrice(l.current_price);
+                const origPrice = l.original_list_price && Number(l.original_list_price) !== Number(l.current_price)
+                    ? '<div style="font-size:11px;color:var(--gray-400)">orig ' + fmtPrice(l.original_list_price) + '</div>'
+                    : '';
+
+                const listingPrice = Number(l.sold_price || l.current_price || 0);
+                const ppsf = propHistorySqft > 0 ? listingPrice / propHistorySqft : null;
+                const ppsfHtml = ppsf ? '$' + Math.round(ppsf) : '—';
+
+                let mktHtml = '<td>—</td>';
+                const isActive = l.status && (l.status.startsWith('A') || l.status === 'CSL' || l.status === 'UCS' || l.status === 'UCNS');
+                if (ppsf && propHistorySqft > 0) {
+                    const range = getPriceRange(listingPrice);
+                    const mktData = salesByRange[range];
+                    if (mktData) {
+                        const mktPpsf = Number(mktData.avg_price_per_sqft);
+                        const diffPpsf = Math.round(ppsf - mktPpsf);
+                        const diffTotal = diffPpsf * propHistorySqft;
+                        const cls = diffPpsf > 5 ? 'over-market' : diffPpsf < -5 ? 'under-market' : 'at-market';
+                        const sign = diffPpsf > 0 ? '+' : '';
+                        if (isActive) {
+                            mktHtml = `<td class="${cls}">${sign}$${diffPpsf}/sf (${sign}${fmt$(diffTotal)})</td>`;
+                        } else {
+                            mktHtml = `<td style="color:var(--gray-400)">${sign}$${diffPpsf}/sf</td>`;
+                        }
+                    }
+                }
+
+                return `
+                <tr>
+                    <td style="text-align:left">${statusBadge(l.status)}</td>
+                    <td><a class="mls-link" href="https://www.google.com/search?q=MLS+${l.mls_number}+Las+Vegas+NV" target="_blank">${l.mls_number}</a></td>
+                    <td>${price}${origPrice}</td>
+                    <td>${ppsfHtml}</td>
+                    ${mktHtml}
+                    <td>${l.dom != null ? l.dom : '—'}</td>
+                    <td>${l.cdom != null ? l.cdom : '—'}</td>
+                    <td>${fmtDate(l.list_date)}</td>
+                    <td>${fmtDate(l.close_date)}</td>
+                    <td style="text-align:left">${l.list_agent_name || '—'}</td>
+                    <td style="text-align:left">${l.selling_agent_name || '—'}</td>
+                </tr>`;
+            }).join('');
+
+            let paginationHtml = '';
+            if (totalPages > 1) {
+                paginationHtml = `
+                <div class="pagination">
+                    <button class="btn btn-outline" onclick="renderPropertyHistory(${propHistoryPage - 1})" ${propHistoryPage === 0 ? 'disabled' : ''}>Prev</button>
+                    <span>Showing ${start + 1}\u2013${end} of ${total} &nbsp; (Page ${currentPage} of ${totalPages})</span>
+                    <button class="btn btn-outline" onclick="renderPropertyHistory(${propHistoryPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}>Next</button>
+                </div>`;
+            }
+
+            document.getElementById('propertyHistoryContainer').innerHTML = `
+            <table>
+                <thead>
+                    <tr>
+                        <th style="text-align:left">Status</th>
+                        <th>MLS#</th>
+                        <th>Price</th>
+                        <th>$/SqFt</th>
+                        <th>vs Market</th>
+                        <th>DOM</th>
+                        <th>CDOM</th>
+                        <th>Listed</th>
+                        <th>Closed</th>
+                        <th style="text-align:left">List Agent</th>
+                        <th style="text-align:left">Selling Agent</th>
+                    </tr>
+                </thead>
+                <tbody>${histRows}</tbody>
+            </table>
+            ${paginationHtml}
+            <div style="font-size:11px; color:var(--gray-400); margin-top:6px">
+                vs Market compares $/sqft to avg sold $/sqft in same price range.
+                <span class="over-market">Red = over market</span> &nbsp;
+                <span class="under-market">Green = under market</span> &nbsp;
+                (Active listings shown in bold, historical in gray)
+            </div>`;
+        }
+
+        function clearPropertySearch() {
+            document.getElementById('propertySearch').value = '';
+            document.getElementById('clearPropBtn').style.display = 'none';
+            document.getElementById('propertyDetail').className = 'agent-detail';
+            document.getElementById('propertyHistoryCard').style.display = 'none';
+        }
+
+        // =====================================================================
+        // Data Coverage Panel
+        // =====================================================================
+        async function loadCoverage() {
+            try {
+                const { data, error } = await sb.rpc('get_import_coverage');
+                if (error) throw error;
+                renderCoverage(data);
+            } catch (err) {
+                // Graceful fallback — hide panel if import_log doesn't exist
+                document.getElementById('coverageGrid').style.display = 'none';
+            }
+        }
+
+        function renderCoverage(rows) {
+            if (!rows || rows.length === 0) {
+                document.getElementById('coverageGrid').style.display = 'none';
+                return;
+            }
+
+            const groupLabels = {
+                active: 'Active & Under Contract',
+                sold: 'Sold & History',
+                inactive: 'Withdrawn / Expired / Cancelled'
+            };
+            const groupIcons = { active: 'A', sold: 'S', inactive: 'W' };
+
+            const cards = rows.map(r => {
+                const label = groupLabels[r.status_group] || r.status_group;
+                const days = r.days_since_import;
+                const threshold = r.freshness_threshold;
+                const stale = r.is_stale;
+
+                let badgeClass, badgeText, cardClass;
+                if (days === null) {
+                    badgeClass = 'stale-danger';
+                    badgeText = 'No data';
+                    cardClass = 'stale';
+                } else if (stale) {
+                    badgeClass = days > threshold * 2 ? 'stale-danger' : 'stale-warn';
+                    badgeText = days + 'd ago';
+                    cardClass = days > threshold * 2 ? 'stale' : 'warn';
+                } else {
+                    badgeClass = 'fresh';
+                    badgeText = days === 0 ? 'Today' : days === 1 ? 'Yesterday' : days + 'd ago';
+                    cardClass = 'fresh';
+                }
+
+                const dateStr = r.last_import_date
+                    ? new Date(r.last_import_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                    : 'Never';
+
+                let cmdHtml = '';
+                if (stale) {
+                    const cmd = r.status_group === 'active' ? '/export-mls active'
+                        : r.status_group === 'sold' ? '/export-mls sold 30'
+                        : '/export-mls withdrawn,expired,cancelled';
+                    cmdHtml = `
+                        <div class="coverage-cmd">
+                            <code>${cmd}</code>
+                            <button class="copy-btn" onclick="navigator.clipboard.writeText('${cmd}');this.textContent='Copied!'">Copy</button>
+                        </div>`;
+                }
+
+                return `
+                    <div class="coverage-card ${cardClass}">
+                        <div class="coverage-header">
+                            <span class="coverage-title">${label}</span>
+                            <span class="freshness-badge ${badgeClass}">${badgeText}</span>
+                        </div>
+                        <div class="coverage-meta">
+                            Last import: ${dateStr} &bull; ${fmtN(r.total_records)} records &bull; Threshold: ${threshold}d
+                        </div>
+                        ${cmdHtml}
+                    </div>`;
+            }).join('');
+
+            document.getElementById('coverageGrid').innerHTML = cards;
+        }
+
+        function copyCmd(text, btn) {
+            navigator.clipboard.writeText(text);
+            btn.textContent = 'Copied!';
+            setTimeout(() => btn.textContent = 'Copy', 2000);
+        }
+
+        // =====================================================================
+        // Refresh command copy
+        // =====================================================================
+        function copyRefreshCmd() {
+            navigator.clipboard.writeText('/export-mls');
+            const btn = document.getElementById('refreshBtn');
+            btn.textContent = 'Copied!';
+            setTimeout(() => { btn.textContent = '/export-mls'; }, 2000);
+        }
+
+        // =====================================================================
+        // Monthly Volume Grid
+        // =====================================================================
+        async function loadVolumeGrid() {
+            const [salesRes, listingsRes, inventoryRes] = await Promise.all([
+                sb.rpc('get_monthly_sales_grid'),
+                sb.rpc('get_monthly_listings_grid'),
+                sb.rpc('get_monthly_active_snapshot')
+            ]);
+            volumeSalesData = salesRes.error ? [] : (salesRes.data || []);
+            volumeListingsData = listingsRes.error ? [] : (listingsRes.data || []);
+            volumeInventoryData = inventoryRes.error ? [] : (inventoryRes.data || []);
+            renderVolumeGrid();
+        }
+
+        function switchVolumeTab(tab) {
+            currentVolumeTab = tab;
+            document.querySelectorAll('.volume-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.volume-tab').forEach(t => {
+                if ((tab === 'sales' && t.textContent.includes('Sales')) ||
+                    (tab === 'listings' && t.textContent.includes('New')) ||
+                    (tab === 'inventory' && t.textContent.includes('Inventory')))
+                    t.classList.add('active');
+            });
+            renderVolumeGrid();
+        }
+
+        function renderVolumeGrid() {
+            const container = document.getElementById('volumeGridContainer');
+            const tab = currentVolumeTab;
+            const data = tab === 'sales' ? volumeSalesData :
+                         tab === 'listings' ? volumeListingsData : volumeInventoryData;
+
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div class="loading">No data available</div>';
+                return;
+            }
+
+            // Build year→month→count map
+            const yearKey = tab === 'sales' ? 'sale_year' :
+                            tab === 'listings' ? 'list_year' : 'snapshot_year';
+            const monthKey = tab === 'sales' ? 'sale_month' :
+                             tab === 'listings' ? 'list_month' : 'snapshot_month';
+            const countKey = tab === 'sales' ? 'sold_count' :
+                             tab === 'listings' ? 'listing_count' : 'active_count';
+            const isSnapshot = tab === 'inventory';
+
+            const grid = {};
+            let globalMin = Infinity, globalMax = 0;
+            data.forEach(r => {
+                const yr = Number(r[yearKey]);
+                const mo = Number(r[monthKey]);
+                const ct = Number(r[countKey]);
+                if (!grid[yr]) grid[yr] = {};
+                grid[yr][mo] = ct;
+                if (ct > globalMax) globalMax = ct;
+                if (ct < globalMin) globalMin = ct;
+            });
+
+            const years = Object.keys(grid).map(Number).sort();
+            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const now = new Date();
+            const curYear = now.getFullYear();
+            const curMonth = now.getMonth() + 1;
+
+            // Heat map color: interpolate from light gray to gold to navy
+            function heatColor(count) {
+                if (count == null) return '';
+                const ratio = globalMax === globalMin ? 0.5 : (count - globalMin) / (globalMax - globalMin);
+                if (ratio < 0.5) {
+                    // light → gold
+                    const t = ratio * 2;
+                    const r = Math.round(240 + (197 - 240) * t);
+                    const g = Math.round(241 + (165 - 241) * t);
+                    const b = Math.round(243 + (90 - 243) * t);
+                    return `background: rgb(${r},${g},${b})`;
+                } else {
+                    // gold → navy
+                    const t = (ratio - 0.5) * 2;
+                    const r = Math.round(197 + (26 - 197) * t);
+                    const g = Math.round(165 + (35 - 165) * t);
+                    const b = Math.round(90 + (50 - 90) * t);
+                    const textColor = t > 0.4 ? '#fff' : 'inherit';
+                    return `background: rgb(${r},${g},${b}); color: ${textColor}`;
+                }
+            }
+
+            const totalLabel = isSnapshot ? 'Avg' : 'Total';
+            let html = '<table class="volume-grid"><thead><tr><th>Year</th>';
+            months.forEach(m => html += `<th>${m}</th>`);
+            html += `<th>${totalLabel}</th></tr></thead><tbody>`;
+
+            years.forEach(yr => {
+                html += `<tr><td>${yr}</td>`;
+                let yrTotal = 0, yrCount = 0;
+                for (let m = 1; m <= 12; m++) {
+                    const ct = grid[yr]?.[m];
+                    const isPartial = yr === curYear && m === curMonth;
+                    const isFuture = yr === curYear && m > curMonth;
+                    if (isFuture || ct == null) {
+                        html += '<td>—</td>';
+                    } else {
+                        yrTotal += ct;
+                        yrCount++;
+                        const style = heatColor(ct);
+                        const cls = isPartial ? ' class="partial"' : '';
+                        const suffix = isPartial ? '*' : '';
+                        html += `<td${cls} style="${style}; border-radius: 3px;">${fmtN(ct)}${suffix}</td>`;
+                    }
+                }
+                const summaryVal = isSnapshot ? Math.round(yrTotal / (yrCount || 1)) : yrTotal;
+                html += `<td class="yr-total">${fmtN(summaryVal)}</td></tr>`;
+            });
+
+            html += '</tbody></table>';
+            const note = isSnapshot
+                ? '* Partial month &nbsp;|&nbsp; Active Inventory = estimated listings on market at month-end (entry via list date, exit via acceptance/close date or DOM)'
+                : '* Partial month';
+            html += `<div style="font-size:11px; color:var(--gray-400); margin-top:8px;">${note}</div>`;
+            container.innerHTML = html;
+        }
+
+        // =====================================================================
+        // Authentication
+        // =====================================================================
+        async function handleLogin(e) {
+            e.preventDefault();
+            const btn = document.getElementById('loginBtn');
+            const errEl = document.getElementById('loginError');
+            btn.disabled = true;
+            btn.textContent = 'Signing in...';
+            errEl.style.display = 'none';
+
+            const { error } = await sb.auth.signInWithPassword({
+                email: document.getElementById('loginEmail').value,
+                password: document.getElementById('loginPassword').value
+            });
+
+            if (error) {
+                errEl.textContent = error.message;
+                errEl.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Sign In';
+                return;
+            }
+
+            showApp();
+        }
+
+        async function handleLogout() {
+            await sb.auth.signOut();
+            document.getElementById('appWrapper').classList.remove('visible');
+            document.getElementById('loginScreen').style.display = 'flex';
+        }
+
+        function showApp() {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('appWrapper').classList.add('visible');
+            initDates();
+            loadCoverage();
+            loadData();
+            loadTopAgents();
+        }
+
+        // Check for existing session on load
+        (async function init() {
+            const { data: { session } } = await sb.auth.getSession();
+            if (session) {
+                showApp();
+            }
+        })();
+    </script>
+</body>
+</html>
