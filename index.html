@@ -2054,32 +2054,41 @@
         // =====================================================================
         // Agent: Top Agents by Price Point
         // =====================================================================
-        async function loadTopAgentsByPrice(rangeLabel) {
-            topAgentPriceRange = rangeLabel;
-            const bounds = PRICE_RANGE_BOUNDS[rangeLabel] || { min: 0, max: 999999999 };
+        let topAgentPricePage = 0;
+        let topAgentPriceTotalCount = 0;
+
+        async function loadTopAgentsByPrice(rangeLabel, page) {
+            if (rangeLabel !== undefined) topAgentPriceRange = rangeLabel;
+            if (page !== undefined) topAgentPricePage = page;
+            else topAgentPricePage = 0;
+            const bounds = PRICE_RANGE_BOUNDS[topAgentPriceRange] || [0, 999999999];
+            const offset = topAgentPricePage * agentPageSize;
             const container = document.getElementById('topAgentsContainer');
             container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading agents...</div>';
             try {
                 const { data, error } = await sb.rpc('get_top_agents_by_price_range', {
-                    p_min_price: bounds.min,
-                    p_max_price: bounds.max,
-                    p_limit: 15
+                    p_min_price: bounds[0],
+                    p_max_price: bounds[1],
+                    p_limit: agentPageSize,
+                    p_offset: offset
                 });
                 if (error) throw error;
-                renderTopAgentsByPrice(data, rangeLabel);
+                if (data && data.length > 0) topAgentPriceTotalCount = Number(data[0].total_agents);
+                else topAgentPriceTotalCount = 0;
+                renderTopAgentsByPrice(data, topAgentPriceRange, offset);
             } catch (err) {
                 container.innerHTML = '<div class="error-msg">Failed to load: ' + err.message + '</div>';
             }
         }
 
-        function renderTopAgentsByPrice(agents, rangeLabel) {
+        function renderTopAgentsByPrice(agents, rangeLabel, offset) {
             const rangeOptions = Object.keys(PRICE_RANGE_BOUNDS).map(r =>
                 `<option value="${r}" ${r === rangeLabel ? 'selected' : ''}>${r}</option>`
             ).join('');
 
             const rows = (agents || []).map((a, i) => `
                 <tr class="clickable" onclick="searchAgentByName('${a.agent_name.replace(/'/g, "\\'")}')">
-                    <td class="rank-cell">${i + 1}</td>
+                    <td class="rank-cell">${offset + i + 1}</td>
                     <td>${a.agent_name}</td>
                     <td>${a.office_name || '—'}</td>
                     <td>${fmtN(a.active_count)}</td>
@@ -2091,8 +2100,12 @@
                 </tr>
             `).join('');
 
+            const totalPages = Math.ceil(topAgentPriceTotalCount / agentPageSize);
+            const currentPage = topAgentPricePage + 1;
+
             document.getElementById('topAgentsTitle').innerHTML =
-                'Top Agents — <select onchange="loadTopAgentsByPrice(this.value)" style="font-size:16px; font-weight:700; border:1px solid var(--gray-200); border-radius:4px; padding:2px 8px;">' + rangeOptions + '</select>';
+                'Top Agents — <select onchange="loadTopAgentsByPrice(this.value)" style="font-size:16px; font-weight:700; border:1px solid var(--gray-200); border-radius:4px; padding:2px 8px;">' + rangeOptions + '</select>' +
+                (topAgentPriceTotalCount > 0 ? ' <span style="font-size:14px; font-weight:400; color:var(--gray-600)">(' + fmtN(topAgentPriceTotalCount) + ' agents)</span>' : '');
 
             document.getElementById('topAgentsContainer').innerHTML = `
             <table>
@@ -2111,7 +2124,12 @@
                 </thead>
                 <tbody>${rows}</tbody>
             </table>
-            <div style="font-size:11px; color:var(--gray-400); margin-top:8px">Top 15 agents with active or sold listings in this price range. Click a row to view details.</div>`;
+            <div class="pagination">
+                <button class="btn btn-outline" onclick="loadTopAgentsByPrice(undefined, ${topAgentPricePage - 1})" ${topAgentPricePage === 0 ? 'disabled' : ''}>Prev</button>
+                <span>Page ${currentPage} of ${totalPages}</span>
+                <button class="btn btn-outline" onclick="loadTopAgentsByPrice(undefined, ${topAgentPricePage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}>Next</button>
+            </div>
+            <div style="font-size:11px; color:var(--gray-400); margin-top:8px">Agents with active or sold listings in this price range. Click a row to view details.</div>`;
         }
 
         // =====================================================================
