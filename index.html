@@ -2245,15 +2245,21 @@
                 '<div class="loading"><div class="spinner"></div>Loading listings...</div>';
 
             try {
-                const { data, error } = await sb.rpc('search_agent_listings', { p_agent_name: exactName });
-                if (error) throw error;
-                if (!data || data.length === 0) {
+                // Fetch accurate summary stats and listing details in parallel
+                const [summaryRes, listingsRes] = await Promise.all([
+                    sb.rpc('search_agents', { p_name: exactName, p_limit: 1, p_offset: 0 }),
+                    sb.rpc('search_agent_listings', { p_agent_name: exactName })
+                ]);
+                if (listingsRes.error) throw listingsRes.error;
+                if (!listingsRes.data || listingsRes.data.length === 0) {
                     document.getElementById('agentListingsContainer').innerHTML =
                         '<div style="padding:20px; color:var(--gray-400); text-align:center">No listings found</div>';
                     return;
                 }
-                renderAgentDetail(data);
-                renderAgentListings(data);
+                // Use summary stats for KPI cards (accurate totals), fall back to listings
+                const summary = summaryRes.data && summaryRes.data.length > 0 ? summaryRes.data[0] : null;
+                renderAgentDetail(listingsRes.data, summary);
+                renderAgentListings(listingsRes.data);
             } catch (err) {
                 document.getElementById('agentListingsContainer').innerHTML =
                     '<div class="error-msg">Search failed: ' + err.message + '</div>';
@@ -2267,16 +2273,19 @@
             document.getElementById('agentListingsCard').style.display = 'none';
         }
 
-        function renderAgentDetail(listings) {
+        function renderAgentDetail(listings, summary) {
             const activeListings = listings.filter(l => l.status.startsWith('A'));
             const soldListings = listings.filter(l => l.status === 'S' || l.status === 'H');
             const pendingListings = listings.filter(l => l.status === 'P' || l.status === 'US' || l.status === 'UNS');
 
-            const officeName = listings[0].list_office || '';
-            const totalActive = activeListings.length;
-            const totalSold = soldListings.length;
-            const totalPending = pendingListings.length;
+            const officeName = (summary && summary.office_name) || listings[0].list_office || '';
 
+            // Use summary stats (accurate totals from full DB) when available
+            const totalActive = summary ? Number(summary.active_count) : activeListings.length;
+            const totalSold = summary ? Number(summary.sold_count) : soldListings.length;
+            const totalPending = summary ? Number(summary.pending_count) : pendingListings.length;
+
+            // Volume: calculate from listings (summary only has total_volume, not split)
             const activeVol = activeListings.reduce((s, l) => s + Number(l.current_price || 0), 0);
             const soldVol = soldListings.reduce((s, l) => s + Number(l.sold_price || l.current_price || 0), 0);
             const domPool = activeListings.length > 0 ? activeListings
@@ -2286,9 +2295,9 @@
                 ? Math.round(domVals.reduce((s, l) => s + l.dom, 0) / domVals.length)
                 : '—';
 
-            // Get best phone/email from most recent listing
-            const phone = listings.find(l => l.agent_phone)?.agent_phone || '';
-            const email = listings.find(l => l.agent_email)?.agent_email || '';
+            // Get best phone/email from summary or listings
+            const phone = (summary && summary.agent_phone) || listings.find(l => l.agent_phone)?.agent_phone || '';
+            const email = (summary && summary.agent_email) || listings.find(l => l.agent_email)?.agent_email || '';
 
             let contactHtml = '';
             if (phone || email) {
