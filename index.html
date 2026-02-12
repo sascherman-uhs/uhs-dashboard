@@ -984,6 +984,11 @@
 
         <!-- Top Agents -->
         <div class="table-card">
+            <div class="volume-tabs" id="topAgentTabs">
+                <div class="volume-tab active" onclick="switchTopAgentTab('active')">Active Listings</div>
+                <div class="volume-tab" onclick="switchTopAgentTab('sales')">Recent Sales</div>
+                <div class="volume-tab" onclick="switchTopAgentTab('price')">By Price Point</div>
+            </div>
             <h3 id="topAgentsTitle">Top Agents by Active Listings</h3>
             <div id="topAgentsContainer">
                 <div class="loading"><div class="spinner"></div>Loading agents...</div>
@@ -1061,6 +1066,10 @@
         let agentPage = 0;
         const agentPageSize = 10;
         let agentTotalCount = 0;
+        let currentTopAgentTab = 'active';
+        let topAgentSalesPage = 0;
+        let topAgentSalesTotalCount = 0;
+        let topAgentPriceRange = '< $500K';
 
         // Agent listings pagination (client-side)
         let agentListingsData = [];
@@ -1954,6 +1963,155 @@
                 <button class="btn btn-outline" onclick="loadTopAgents(${agentPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}>Next</button>
             </div>
             <div style="font-size:11px; color:var(--gray-400); margin-top:8px">Click a row to view agent details</div>`;
+        }
+
+        // =====================================================================
+        // Agent: Tab Switching
+        // =====================================================================
+        function switchTopAgentTab(tab) {
+            currentTopAgentTab = tab;
+            document.querySelectorAll('#topAgentTabs .volume-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('#topAgentTabs .volume-tab').forEach(t => {
+                if ((tab === 'active' && t.textContent.includes('Active')) ||
+                    (tab === 'sales' && t.textContent.includes('Sales')) ||
+                    (tab === 'price' && t.textContent.includes('Price')))
+                    t.classList.add('active');
+            });
+            if (tab === 'active') { agentPage = 0; loadTopAgents(0); }
+            else if (tab === 'sales') { topAgentSalesPage = 0; loadTopAgentsBySales(0); }
+            else if (tab === 'price') { loadTopAgentsByPrice(topAgentPriceRange); }
+        }
+
+        // =====================================================================
+        // Agent: Top Agents by Recent Sales
+        // =====================================================================
+        async function loadTopAgentsBySales(page) {
+            if (page !== undefined) topAgentSalesPage = page;
+            const offset = topAgentSalesPage * agentPageSize;
+            const container = document.getElementById('topAgentsContainer');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading agents...</div>';
+            try {
+                const { data, error } = await sb.rpc('get_top_agents_by_sales', {
+                    p_limit: agentPageSize,
+                    p_offset: offset
+                });
+                if (error) throw error;
+                if (data && data.length > 0) topAgentSalesTotalCount = Number(data[0].total_agents);
+                renderTopAgentsBySales(data, offset);
+            } catch (err) {
+                container.innerHTML = '<div class="error-msg">Failed to load: ' + err.message + '</div>';
+            }
+        }
+
+        function renderTopAgentsBySales(agents, offset) {
+            const rows = agents.map((a, i) => `
+                <tr class="clickable" onclick="searchAgentByName('${a.agent_name.replace(/'/g, "\\'")}')">
+                    <td class="rank-cell">${offset + i + 1}</td>
+                    <td>${a.agent_name}</td>
+                    <td>${a.office_name || '—'}</td>
+                    <td>${fmtN(a.sold_count)}</td>
+                    <td>${fmt$(Number(a.sold_volume))}</td>
+                    <td>${fmt$(Number(a.avg_sold_price))}</td>
+                    <td>${fmtPct(Number(a.avg_sold_to_list))}</td>
+                    <td>${fmtDom(Number(a.avg_dom))}</td>
+                    <td style="border-left: 2px solid var(--gray-200)">${fmtN(a.active_count)}</td>
+                    <td>${fmt$(Number(a.active_volume))}</td>
+                </tr>
+            `).join('');
+
+            const totalPages = Math.ceil(topAgentSalesTotalCount / agentPageSize);
+            const currentPage = topAgentSalesPage + 1;
+
+            document.getElementById('topAgentsTitle').textContent =
+                'Top Agents by Recent Sales — Last 6 Months (' + fmtN(topAgentSalesTotalCount) + ' total)';
+
+            document.getElementById('topAgentsContainer').innerHTML = `
+            <table>
+                <thead>
+                    <tr>
+                        <th style="text-align:center">#</th>
+                        <th style="text-align:left">Agent</th>
+                        <th style="text-align:left">Office</th>
+                        <th class="section-sold">Sold</th>
+                        <th class="section-sold">Volume</th>
+                        <th class="section-sold">Avg Price</th>
+                        <th class="section-sold">S/L %</th>
+                        <th class="section-sold">Avg DOM</th>
+                        <th class="section-active" style="border-left: 2px solid var(--gray-200)">Active</th>
+                        <th class="section-active">Active Vol</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+            <div class="pagination">
+                <button class="btn btn-outline" onclick="loadTopAgentsBySales(${topAgentSalesPage - 1})" ${topAgentSalesPage === 0 ? 'disabled' : ''}>Prev</button>
+                <span>Page ${currentPage} of ${totalPages}</span>
+                <button class="btn btn-outline" onclick="loadTopAgentsBySales(${topAgentSalesPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}>Next</button>
+            </div>
+            <div style="font-size:11px; color:var(--gray-400); margin-top:8px">Click a row to view agent details</div>`;
+        }
+
+        // =====================================================================
+        // Agent: Top Agents by Price Point
+        // =====================================================================
+        async function loadTopAgentsByPrice(rangeLabel) {
+            topAgentPriceRange = rangeLabel;
+            const bounds = PRICE_RANGE_BOUNDS[rangeLabel] || { min: 0, max: 999999999 };
+            const container = document.getElementById('topAgentsContainer');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading agents...</div>';
+            try {
+                const { data, error } = await sb.rpc('get_top_agents_by_price_range', {
+                    p_min_price: bounds.min,
+                    p_max_price: bounds.max,
+                    p_limit: 15
+                });
+                if (error) throw error;
+                renderTopAgentsByPrice(data, rangeLabel);
+            } catch (err) {
+                container.innerHTML = '<div class="error-msg">Failed to load: ' + err.message + '</div>';
+            }
+        }
+
+        function renderTopAgentsByPrice(agents, rangeLabel) {
+            const rangeOptions = Object.keys(PRICE_RANGE_BOUNDS).map(r =>
+                `<option value="${r}" ${r === rangeLabel ? 'selected' : ''}>${r}</option>`
+            ).join('');
+
+            const rows = (agents || []).map((a, i) => `
+                <tr class="clickable" onclick="searchAgentByName('${a.agent_name.replace(/'/g, "\\'")}')">
+                    <td class="rank-cell">${i + 1}</td>
+                    <td>${a.agent_name}</td>
+                    <td>${a.office_name || '—'}</td>
+                    <td>${fmtN(a.active_count)}</td>
+                    <td>${fmt$(Number(a.active_volume))}</td>
+                    <td>${fmtDom(Number(a.avg_dom))}</td>
+                    <td style="border-left: 2px solid var(--gray-200)">${fmtN(a.sold_count)}</td>
+                    <td>${fmt$(Number(a.sold_volume))}</td>
+                    <td>${fmt$(Number(a.avg_sold_price))}</td>
+                </tr>
+            `).join('');
+
+            document.getElementById('topAgentsTitle').innerHTML =
+                'Top Agents — <select onchange="loadTopAgentsByPrice(this.value)" style="font-size:16px; font-weight:700; border:1px solid var(--gray-200); border-radius:4px; padding:2px 8px;">' + rangeOptions + '</select>';
+
+            document.getElementById('topAgentsContainer').innerHTML = `
+            <table>
+                <thead>
+                    <tr>
+                        <th style="text-align:center">#</th>
+                        <th style="text-align:left">Agent</th>
+                        <th style="text-align:left">Office</th>
+                        <th class="section-active">Active</th>
+                        <th class="section-active">Volume</th>
+                        <th class="section-active">Avg DOM</th>
+                        <th class="section-sold" style="border-left: 2px solid var(--gray-200)">Sold (6mo)</th>
+                        <th class="section-sold">Sold Vol</th>
+                        <th class="section-sold">Avg Sold</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+            <div style="font-size:11px; color:var(--gray-400); margin-top:8px">Top 15 agents with active or sold listings in this price range. Click a row to view details.</div>`;
         }
 
         // =====================================================================
