@@ -1994,10 +1994,15 @@
                 // Multiple matches — show disambiguation list
                 const rows = agents.map(a => {
                     const nameEsc = a.agent_name.replace(/'/g, "\\'");
+                    const phone = a.agent_phone || '';
+                    const email = a.agent_email || '';
+                    let contactMeta = '';
+                    if (phone || email) contactMeta = `<div class="meta">${[phone, email].filter(Boolean).join(' &bull; ')}</div>`;
                     return `<div class="prop-result-item" onclick="loadAgentListings('${nameEsc}')">
                         <div>
                             <div class="addr">${a.agent_name}</div>
                             <div class="meta">${a.office_name || ''}</div>
+                            ${contactMeta}
                         </div>
                         <div style="text-align:right">
                             <div class="meta">${a.active_count} active &bull; ${a.sold_count} sold</div>
