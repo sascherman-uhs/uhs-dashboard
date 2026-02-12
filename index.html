@@ -1960,8 +1960,9 @@
         // Agent: Search
         // =====================================================================
         function searchAgentByName(name) {
-            document.getElementById('agentSearch').value = name;
-            searchAgent();
+            document.getElementById('clearAgentBtn').style.display = '';
+            document.getElementById('agentListingsCard').style.display = 'block';
+            loadAgentListings(name);
         }
 
         async function searchAgent() {
@@ -1969,17 +1970,62 @@
             if (!name) return;
 
             document.getElementById('clearAgentBtn').style.display = '';
+            document.getElementById('agentDetail').className = 'agent-detail';
             document.getElementById('agentListingsCard').style.display = 'block';
             document.getElementById('agentListingsContainer').innerHTML =
                 '<div class="loading"><div class="spinner"></div>Searching...</div>';
 
             try {
-                const { data, error } = await sb.rpc('search_agent_listings', { p_agent_name: name });
+                // Step 1: Find matching agents
+                const { data: agents, error: agentsErr } = await sb.rpc('search_agents', { p_name: name });
+                if (agentsErr) throw agentsErr;
+                if (!agents || agents.length === 0) {
+                    document.getElementById('agentListingsContainer').innerHTML =
+                        '<div style="padding:20px; color:var(--gray-400); text-align:center">No agents found matching "' + name + '"</div>';
+                    return;
+                }
+
+                // If exactly 1 match, go straight to detail
+                if (agents.length === 1) {
+                    loadAgentListings(agents[0].agent_name);
+                    return;
+                }
+
+                // Multiple matches — show disambiguation list
+                const rows = agents.map(a => {
+                    const nameEsc = a.agent_name.replace(/'/g, "\\'");
+                    return `<div class="prop-result-item" onclick="loadAgentListings('${nameEsc}')">
+                        <div>
+                            <div class="addr">${a.agent_name}</div>
+                            <div class="meta">${a.office_name || ''}</div>
+                        </div>
+                        <div style="text-align:right">
+                            <div class="meta">${a.active_count} active &bull; ${a.sold_count} sold</div>
+                            <div class="meta">${fmt$(Number(a.total_volume))} volume</div>
+                        </div>
+                    </div>`;
+                }).join('');
+
+                document.getElementById('agentListingsContainer').innerHTML =
+                    `<div style="font-size:13px; color:var(--gray-600); margin-bottom:10px">${agents.length} agents match "${name}" — select one:</div>
+                     <div class="prop-results">${rows}</div>`;
+            } catch (err) {
+                document.getElementById('agentListingsContainer').innerHTML =
+                    '<div class="error-msg">Search failed: ' + err.message + '</div>';
+            }
+        }
+
+        async function loadAgentListings(exactName) {
+            document.getElementById('agentSearch').value = exactName;
+            document.getElementById('agentListingsContainer').innerHTML =
+                '<div class="loading"><div class="spinner"></div>Loading listings...</div>';
+
+            try {
+                const { data, error } = await sb.rpc('search_agent_listings', { p_agent_name: exactName });
                 if (error) throw error;
                 if (!data || data.length === 0) {
-                    document.getElementById('agentDetail').className = 'agent-detail';
                     document.getElementById('agentListingsContainer').innerHTML =
-                        '<div style="padding:20px; color:var(--gray-400); text-align:center">No listings found for "' + name + '"</div>';
+                        '<div style="padding:20px; color:var(--gray-400); text-align:center">No listings found</div>';
                     return;
                 }
                 renderAgentDetail(data);
