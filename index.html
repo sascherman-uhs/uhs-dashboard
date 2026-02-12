@@ -2187,9 +2187,14 @@
                     </div>`;
                 }).join('');
 
+                const totalMatches = agents[0].total_matches || agents.length;
+                const moreMsg = totalMatches > agents.length
+                    ? `<div style="font-size:12px; color:var(--gold-dark); margin-top:10px; text-align:center">Showing ${agents.length} of ${totalMatches} matches — add more of the name to narrow results</div>`
+                    : '';
+
                 document.getElementById('agentListingsContainer').innerHTML =
-                    `<div style="font-size:13px; color:var(--gray-600); margin-bottom:10px">${agents.length} agents match "${name}" — select one:</div>
-                     <div class="prop-results">${rows}</div>`;
+                    `<div style="font-size:13px; color:var(--gray-600); margin-bottom:10px">${totalMatches} agents match "${name}" — select one:</div>
+                     <div class="prop-results">${rows}</div>${moreMsg}`;
             } catch (err) {
                 document.getElementById('agentListingsContainer').innerHTML =
                     '<div class="error-msg">Search failed: ' + err.message + '</div>';
