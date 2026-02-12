@@ -1076,6 +1076,7 @@
         const agentSearchPageSize = 10;
         let agentSearchTotalCount = 0;
         let agentSearchName = '';
+        let agentSearchSort = 'activity';
 
         // Agent listings pagination (client-side)
         let agentListingsData = [];
@@ -2147,6 +2148,12 @@
             loadAgentListings(name);
         }
 
+        function switchAgentSearchSort(sort) {
+            agentSearchSort = sort;
+            agentSearchPage = 0;
+            searchAgent(0);
+        }
+
         async function searchAgent(page) {
             const name = document.getElementById('agentSearch').value.trim();
             if (!name) return;
@@ -2169,7 +2176,8 @@
                 const { data: agents, error: agentsErr } = await sb.rpc('search_agents', {
                     p_name: agentSearchName,
                     p_limit: agentSearchPageSize,
-                    p_offset: offset
+                    p_offset: offset,
+                    p_sort: agentSearchSort
                 });
                 if (agentsErr) throw agentsErr;
                 if (!agents || agents.length === 0) {
@@ -2215,9 +2223,16 @@
                         <button class="btn btn-outline" onclick="searchAgent(${agentSearchPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}>Next</button>
                     </div>` : '';
 
+                const sortToggle = `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px">
+                    <div style="font-size:13px; color:var(--gray-600)">${agentSearchTotalCount} agents match "${agentSearchName}" — select one:</div>
+                    <div style="display:flex; gap:0">
+                        <button class="btn ${agentSearchSort === 'activity' ? 'btn-gold' : 'btn-outline'}" onclick="switchAgentSearchSort('activity')" style="font-size:11px; padding:4px 10px; border-radius:4px 0 0 4px">By Activity</button>
+                        <button class="btn ${agentSearchSort === 'alpha' ? 'btn-gold' : 'btn-outline'}" onclick="switchAgentSearchSort('alpha')" style="font-size:11px; padding:4px 10px; border-radius:0 4px 4px 0">A–Z</button>
+                    </div>
+                </div>`;
+
                 document.getElementById('agentListingsContainer').innerHTML =
-                    `<div style="font-size:13px; color:var(--gray-600); margin-bottom:10px">${agentSearchTotalCount} agents match "${agentSearchName}" — select one:</div>
-                     <div class="prop-results">${rows}</div>${pagination}`;
+                    `${sortToggle}<div class="prop-results">${rows}</div>${pagination}`;
             } catch (err) {
                 document.getElementById('agentListingsContainer').innerHTML =
                     '<div class="error-msg">Search failed: ' + err.message + '</div>';
