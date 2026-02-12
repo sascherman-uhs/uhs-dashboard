@@ -2209,7 +2209,7 @@
                         </div>
                         <div style="text-align:right">
                             <div class="meta">${a.active_count} active &bull; ${a.pending_count} pending &bull; ${a.sold_count} sold</div>
-                            <div class="meta">${fmt$(Number(a.total_volume))} volume</div>
+                            <div class="meta">${fmt$(Number(a.total_volume))} sold vol</div>
                         </div>
                     </div>`;
                 }).join('');
@@ -2285,9 +2285,10 @@
             const totalSold = summary ? Number(summary.sold_count) : soldListings.length;
             const totalPending = summary ? Number(summary.pending_count) : pendingListings.length;
 
-            // Volume: calculate from listings (summary only has total_volume, not split)
+            // Volume: use summary sold volume when available (accurate across all listings)
             const activeVol = activeListings.reduce((s, l) => s + Number(l.current_price || 0), 0);
-            const soldVol = soldListings.reduce((s, l) => s + Number(l.sold_price || l.current_price || 0), 0);
+            const soldVol = summary ? Number(summary.total_volume || 0)
+                : soldListings.reduce((s, l) => s + Number(l.sold_price || l.current_price || 0), 0);
             const domPool = activeListings.length > 0 ? activeListings
                 : soldListings.length > 0 ? soldListings : listings;
             const domVals = domPool.filter(l => l.dom != null);
