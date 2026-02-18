@@ -1395,35 +1395,57 @@
                 },
             };
 
-            // Active chart
+            // Active chart (stacked: active vs under contract)
+            const activeOnly = active.map(r => Number(r.listing_count) - Number(r.uc_count || 0));
+            const ucOnly = active.map(r => Number(r.uc_count || 0));
+
             if (activeChart) activeChart.destroy();
             activeChart = new Chart(document.getElementById('activeChart'), {
                 type: 'bar',
                 data: {
                     labels,
-                    datasets: [{
-                        label: 'Active Listings',
-                        data: active.map(r => Number(r.listing_count)),
-                        backgroundColor: chartColors.navy,
-                        borderColor: chartColors.navyBorder,
-                        borderWidth: 1,
-                        borderRadius: 4,
-                    }],
+                    datasets: [
+                        {
+                            label: 'Active',
+                            data: activeOnly,
+                            backgroundColor: chartColors.navy,
+                            borderColor: chartColors.navyBorder,
+                            borderWidth: 1,
+                            borderRadius: { topLeft: 4, topRight: 4 },
+                        },
+                        {
+                            label: 'Under Contract',
+                            data: ucOnly,
+                            backgroundColor: chartColors.gold,
+                            borderColor: chartColors.goldBorder,
+                            borderWidth: 1,
+                            borderRadius: 0,
+                        },
+                    ],
                 },
                 options: {
                     ...commonOptions,
                     plugins: {
                         ...commonOptions.plugins,
+                        legend: { display: true, labels: { usePointStyle: true, pointStyle: 'rect', padding: 16, font: { size: 11 } } },
                         tooltip: {
                             ...commonOptions.plugins.tooltip,
                             callbacks: {
-                                afterLabel: (ctx) => {
-                                    const r = active[ctx.dataIndex];
-                                    return `Avg: ${fmt$(Number(r.avg_price))}\nDOM: ${fmtDom(Number(r.avg_dom))}`;
+                                afterBody: (ctxArr) => {
+                                    const i = ctxArr[0].dataIndex;
+                                    const r = active[i];
+                                    const total = Number(r.listing_count);
+                                    const uc = Number(r.uc_count || 0);
+                                    return `Total: ${fmtN(total)}\nAvg: ${fmt$(Number(r.avg_price))}\nDOM: ${fmtDom(Number(r.avg_dom))}`;
                                 }
                             }
                         }
-                    }
+                    },
+                    scales: {
+                        ...commonOptions.scales,
+                        x: { ...commonOptions.scales.x, stacked: true },
+                        y: { ...commonOptions.scales.y, stacked: true },
+                    },
                 },
             });
 
