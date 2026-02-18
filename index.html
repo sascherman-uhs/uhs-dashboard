@@ -1267,7 +1267,7 @@
                 document.getElementById('freshness').textContent =
                     'Sales window: ' + formatDateRange(startDate, endDate);
 
-                renderKPIs(active, sales);
+                renderKPIs(active, sales, hidden);
                 renderCharts(active, sales);
                 renderTable(active, sales);
                 renderHiddenDom(hidden);
@@ -1290,9 +1290,22 @@
         // =====================================================================
         // KPI Cards
         // =====================================================================
-        function renderKPIs(active, sales) {
+        function renderKPIs(active, sales, hidden) {
             const totalActive = active.reduce((s, r) => s + Number(r.listing_count), 0);
             const totalSold = sales.reduce((s, r) => s + Number(r.sold_count), 0);
+            const totalUC = active.reduce((s, r) => s + Number(r.uc_count || 0), 0);
+
+            // Average hidden days (weighted by hidden_count across price ranges)
+            let avgHiddenDays = 0;
+            if (hidden && hidden.length) {
+                let hiddenSum = 0, hiddenWeight = 0;
+                hidden.forEach(r => {
+                    const hc = Number(r.hidden_count || 0);
+                    const extra = Number(r.avg_actual_dom || 0) - Number(r.avg_reported_dom || 0);
+                    if (hc > 0 && extra > 0) { hiddenSum += extra * hc; hiddenWeight += hc; }
+                });
+                avgHiddenDays = hiddenWeight > 0 ? Math.round(hiddenSum / hiddenWeight) : 0;
+            }
 
             // Weighted averages
             const avgActivePrice = weightedAvg(active, 'avg_price', 'listing_count');
@@ -1309,7 +1322,7 @@
                 <div class="kpi-card highlight">
                     <div class="kpi-label">Active Listings</div>
                     <div class="kpi-value">${fmtN(totalActive)}</div>
-                    <div class="kpi-sub">${reductionPct}% with price reductions</div>
+                    <div class="kpi-sub">${fmtN(totalUC)} under contract &bull; ${reductionPct}% price reduced</div>
                 </div>
                 <div class="kpi-card">
                     <div class="kpi-label">Avg Active Price</div>
@@ -1319,7 +1332,7 @@
                 <div class="kpi-card">
                     <div class="kpi-label">Avg Active DOM</div>
                     <div class="kpi-value">${fmtDom(avgActiveDom)}</div>
-                    <div class="kpi-sub">Days on market</div>
+                    <div class="kpi-sub">+${avgHiddenDays} avg hidden days</div>
                 </div>
                 <div class="kpi-card highlight">
                     <div class="kpi-label">Sold</div>
