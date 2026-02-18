@@ -1334,7 +1334,7 @@
                 <div class="kpi-card">
                     <div class="kpi-label">Avg Sold Price</div>
                     <div class="kpi-value">${fmt$(avgSoldPrice)}</div>
-                    <div class="kpi-sub">DOM: ${fmtDom(avgSoldDom)}${avgSoldHidden > 0 ? ` (+${avgSoldHidden} hidden)` : ''} &bull; ${fmtDiscount(avgSoldToList)} off list</div>
+                    <div class="kpi-sub">DOM: ${fmtDom(avgSoldDom)}${avgSoldHidden > 0 ? ` (+${avgSoldHidden} hidden)` : ''} &bull; ${fmt$(avgSoldToList > 0 ? avgSoldPrice / (avgSoldToList / 100) - avgSoldPrice : 0)} avg discount</div>
                 </div>
                 <div class="kpi-card">
                     <div class="kpi-label">Avg Discount</div>
