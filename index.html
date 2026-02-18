@@ -1302,6 +1302,8 @@
             const avgHiddenDays = Math.round(avgActiveCdom - avgActiveDom);
             const avgSoldPrice = weightedAvg(sales, 'avg_sold_price', 'sold_count');
             const avgSoldDom = weightedAvg(sales, 'avg_dom', 'sold_count');
+            const avgSoldCdom = weightedAvg(sales, 'avg_cdom', 'sold_count');
+            const avgSoldHidden = Math.round(avgSoldCdom - avgSoldDom);
 
             const avgSoldToList = weightedAvg(sales, 'avg_sold_to_list_pct', 'sold_count');
 
@@ -1332,7 +1334,7 @@
                 <div class="kpi-card">
                     <div class="kpi-label">Avg Sold Price</div>
                     <div class="kpi-value">${fmt$(avgSoldPrice)}</div>
-                    <div class="kpi-sub">Avg DOM: ${fmtDom(avgSoldDom)}</div>
+                    <div class="kpi-sub">DOM: ${fmtDom(avgSoldDom)}${avgSoldHidden > 0 ? ` (+${avgSoldHidden} hidden)` : ''} &bull; ${fmtDiscount(avgSoldToList)} off list</div>
                 </div>
                 <div class="kpi-card">
                     <div class="kpi-label">Avg Discount</div>
