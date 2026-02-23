@@ -2391,6 +2391,20 @@
             return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
         }
 
+        function fmtClosedOrCOE(l) {
+            if (l.close_date) return fmtDate(l.close_date);
+            const ucStatuses = ['UCS', 'US', 'UCNS', 'UNS', 'COS', 'P'];
+            if (ucStatuses.includes((l.status || '').toUpperCase()) && l.acceptance_date) {
+                const accepted = new Date(l.acceptance_date + 'T00:00:00');
+                const estCOE = new Date(accepted);
+                estCOE.setDate(estCOE.getDate() + 30);
+                const estStr = estCOE.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+                const accStr = fmtDate(l.acceptance_date);
+                return `<span style="color:#b8860b;font-weight:600">Est. ${estStr}</span><br><span style="font-size:0.75em;color:#888">Accepted ${accStr}</span>`;
+            }
+            return '—';
+        }
+
         function renderAgentListings(listings, page) {
             agentListingsData = listings;
             agentListingsPage = page || 0;
@@ -2672,7 +2686,7 @@
                     <td>${l.dom != null ? l.dom : '—'}</td>
                     <td>${l.cdom != null ? l.cdom : '—'}</td>
                     <td>${fmtDate(l.list_date)}</td>
-                    <td>${fmtDate(l.close_date)}</td>
+                    <td>${fmtClosedOrCOE(l)}</td>
                     <td style="text-align:left">${l.list_agent_name || '—'}</td>
                     <td style="text-align:left">${l.selling_agent_name || '—'}</td>
                 </tr>`;
@@ -2700,7 +2714,7 @@
                         <th>DOM</th>
                         <th>CDOM</th>
                         <th>Listed</th>
-                        <th>Closed</th>
+                        <th>Closed / Est. COE</th>
                         <th style="text-align:left">List Agent</th>
                         <th style="text-align:left">Selling Agent</th>
                     </tr>
