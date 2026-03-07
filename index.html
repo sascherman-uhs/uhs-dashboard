@@ -314,6 +314,11 @@
             letter-spacing: 0.5px;
             color: var(--gray-600);
         }
+        .agent-kpi .sub {
+            font-size: 11px;
+            color: var(--gray-400);
+            margin-top: 2px;
+        }
 
         /* Status badges */
         .status-badge {
@@ -352,6 +357,122 @@
         .over-market { color: #dc2626; font-weight: 600; }
         .under-market { color: #16a34a; font-weight: 600; }
         .at-market { color: var(--gray-600); }
+
+        /* GPS Locate Me button */
+        .gps-btn {
+            width: 40px;
+            height: 40px;
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            background: var(--white);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+        .gps-btn:hover { border-color: var(--gold); background: #fffbf0; }
+        .gps-btn.loading { animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .gps-btn svg { width: 20px; height: 20px; color: var(--gray-600); }
+        .gps-btn:hover svg { color: var(--gold-dark); }
+        .gps-status { font-size: 11px; color: var(--gray-400); margin-top: 4px; }
+
+        /* CMA Tabs */
+        .cma-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 16px;
+        }
+        .cma-tab {
+            padding: 8px 20px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid var(--gray-200);
+            background: var(--white);
+            color: var(--gray-600);
+        }
+        .cma-tab:first-child { border-radius: 6px 0 0 6px; }
+        .cma-tab:last-child { border-radius: 0 6px 6px 0; }
+        .cma-tab.active {
+            background: var(--navy);
+            color: var(--white);
+            border-color: var(--navy);
+        }
+
+        /* Comp filter bar */
+        .comp-filter-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .comp-filter-bar label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--gray-600);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .comp-filter-bar select {
+            padding: 6px 12px;
+            border: 1px solid var(--gray-200);
+            border-radius: 6px;
+            font-size: 13px;
+            background: var(--white);
+            color: var(--gray-800);
+        }
+        .comp-filter-bar .comp-count {
+            font-size: 12px;
+            color: var(--gray-400);
+            margin-left: auto;
+        }
+
+        /* Match quality badge */
+        .match-badge {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+        .match-badge.sub { background: #dcfce7; color: #166534; }
+        .match-badge.zip { background: #dbeafe; color: #1e40af; }
+
+        /* Comp KPI cards */
+        .comp-kpis {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .comp-kpi {
+            background: var(--gray-50);
+            border-radius: 8px;
+            padding: 12px 14px;
+            text-align: center;
+            border: 1px solid var(--gray-200);
+        }
+        .comp-kpi .val {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--navy);
+        }
+        .comp-kpi .lbl {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--gray-600);
+            margin-top: 2px;
+        }
+        .comp-kpi .vs {
+            font-size: 11px;
+            margin-top: 2px;
+        }
 
         /* Property detail card */
         .prop-specs {
@@ -815,6 +936,8 @@
             .coverage-grid { gap: 8px; margin-bottom: 12px; }
             .coverage-cmd { display: none; }
             .agent-search-bar { display: none; }
+            .comp-filter-bar { display: none; }
+            .gps-status { display: none; }
             .drilldown-card { display: none !important; }
             .volume-grid { font-size: 10px; }
             .volume-grid th, .volume-grid td { padding: 4px 6px; }
@@ -978,6 +1101,10 @@
 
         <!-- Agent Listings Table (hidden until search) -->
         <div class="table-card" id="agentListingsCard" style="display:none; margin-bottom:20px">
+            <div class="volume-tabs" id="agentListingTabs" style="display:none">
+                <div class="volume-tab active" id="agentTabListings" onclick="switchAgentListingTab('listings')">Listings</div>
+                <div class="volume-tab" id="agentTabBuyer" onclick="switchAgentListingTab('buyer')">Buyer Deals</div>
+            </div>
             <h3 id="agentListingsTitle">Agent Listings</h3>
             <div id="agentListingsContainer"></div>
         </div>
@@ -1001,18 +1128,48 @@
         </div>
 
         <div class="agent-search-bar">
+            <button class="gps-btn" id="gpsBtn" onclick="locateMe()" title="Use my location">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>
+                </svg>
+            </button>
             <input type="text" id="propertySearch" placeholder="Search by address (e.g. 9725 Starlight)..." onkeydown="if(event.key==='Enter') searchProperty()">
             <button class="btn btn-gold" onclick="searchProperty()">Search</button>
             <button class="btn btn-outline" onclick="clearPropertySearch()" style="display:none" id="clearPropBtn">Clear</button>
         </div>
+        <div class="gps-status" id="gpsStatus"></div>
 
         <!-- Property Detail (hidden until search) -->
         <div class="agent-detail" id="propertyDetail"></div>
 
-        <!-- Property Listing History (hidden until search) -->
-        <div class="table-card" id="propertyHistoryCard" style="display:none; margin-bottom:20px">
-            <h3 id="propertyHistoryTitle">Listing History</h3>
-            <div id="propertyHistoryContainer"></div>
+        <!-- CMA Tabs (hidden until property selected) -->
+        <div id="cmaTabs" style="display:none">
+            <div class="cma-tabs">
+                <div class="cma-tab active" onclick="switchCmaTab('sales')">Recent Sales</div>
+                <div class="cma-tab" onclick="switchCmaTab('active')">Active Listings</div>
+                <div class="cma-tab" onclick="switchCmaTab('history')">Listing History</div>
+            </div>
+
+            <!-- Comp filter (shown for sales/active tabs) -->
+            <div class="comp-filter-bar" id="compFilterBar">
+                <label>Match:</label>
+                <select id="compTightness" onchange="loadComps()">
+                    <option value="tight">Same Subdivision (Appraiser)</option>
+                    <option value="medium">Same Zip (Similar Size)</option>
+                    <option value="wide">Same Zip (All)</option>
+                </select>
+                <span class="comp-count" id="compCount"></span>
+            </div>
+
+            <!-- Comp KPI summary -->
+            <div id="compSummary"></div>
+
+            <!-- Comp table / listing history -->
+            <div class="table-card" id="cmaContentCard" style="margin-bottom:20px">
+                <div id="cmaContent">
+                    <div class="loading"><div class="spinner"></div>Loading...</div>
+                </div>
+            </div>
         </div>
     </div>
     </div><!-- /app-wrapper -->
@@ -1083,11 +1240,24 @@
         let agentListingsPage = 0;
         const agentListingsPageSize = 10;
 
+        // Agent buyer deals (client-side)
+        let agentBuyerDealsData = [];
+        let agentBuyerDealsPage = 0;
+        let agentActiveTab = 'listings'; // 'listings' or 'buyer'
+
         // Property history pagination (client-side)
         let propHistoryData = [];
         let propHistorySqft = 0;
         let propHistoryPage = 0;
         const propHistoryPageSize = 10;
+
+        // CMA state
+        let cmaTab = 'sales'; // 'sales' | 'active' | 'history'
+        let cmaParcelId = null;
+        let cmaSubjectProperty = null; // {beds, baths, sqft, year_built, current_price, subdivision, zip_code}
+        let compData = [];
+        let compPage = 0;
+        const compPageSize = 25;
 
         // Determine which price range a price falls into
         function getPriceRange(price) {
@@ -2235,8 +2405,8 @@
                             ${contactMeta}
                         </div>
                         <div style="text-align:right">
-                            <div class="meta">${a.active_count} active &bull; ${a.pending_count} pending &bull; ${a.sold_count} sold</div>
-                            <div class="meta">${fmt$(Number(a.total_volume))} sold vol</div>
+                            <div class="meta">${a.active_count} active &bull; ${a.pending_count} pending &bull; ${a.sold_count} sold${a.buyer_sold_count > 0 ? ' &bull; ' + a.buyer_sold_count + ' buyer' : ''}</div>
+                            <div class="meta">${fmt$(Number(a.total_volume))} sold vol${a.buyer_sold_volume > 0 ? ' &bull; ' + fmt$(Number(a.buyer_sold_volume)) + ' buyer vol' : ''}</div>
                         </div>
                     </div>`;
                 }).join('');
@@ -2272,21 +2442,45 @@
                 '<div class="loading"><div class="spinner"></div>Loading listings...</div>';
 
             try {
-                // Fetch accurate summary stats and listing details in parallel
-                const [summaryRes, listingsRes] = await Promise.all([
+                // Fetch summary stats, listing details, and buyer deals in parallel
+                const [summaryRes, listingsRes, buyerRes] = await Promise.all([
                     sb.rpc('search_agents', { p_name: exactName, p_limit: 1, p_offset: 0 }),
-                    sb.rpc('search_agent_listings', { p_agent_name: exactName })
+                    sb.rpc('search_agent_listings', { p_agent_name: exactName }),
+                    sb.rpc('search_agent_buyer_deals', { p_agent_name: exactName })
                 ]);
                 if (listingsRes.error) throw listingsRes.error;
-                if (!listingsRes.data || listingsRes.data.length === 0) {
+
+                // Store buyer deals
+                agentBuyerDealsData = (buyerRes.data && !buyerRes.error) ? buyerRes.data : [];
+
+                if ((!listingsRes.data || listingsRes.data.length === 0) && agentBuyerDealsData.length === 0) {
                     document.getElementById('agentListingsContainer').innerHTML =
                         '<div style="padding:20px; color:var(--gray-400); text-align:center">No listings found</div>';
+                    document.getElementById('agentListingTabs').style.display = 'none';
                     return;
                 }
+
+                const listings = listingsRes.data || [];
                 // Use summary stats for KPI cards (accurate totals), fall back to listings
                 const summary = summaryRes.data && summaryRes.data.length > 0 ? summaryRes.data[0] : null;
-                renderAgentDetail(listingsRes.data, summary);
-                renderAgentListings(listingsRes.data);
+                renderAgentDetail(listings, summary);
+
+                // Show tabs with counts
+                const tabsEl = document.getElementById('agentListingTabs');
+                tabsEl.style.display = 'flex';
+                document.getElementById('agentTabListings').textContent = 'Listings (' + listings.length + ')';
+                document.getElementById('agentTabBuyer').textContent = 'Buyer Deals (' + agentBuyerDealsData.length + ')';
+
+                // Default to listings tab
+                agentActiveTab = 'listings';
+                document.getElementById('agentTabListings').className = 'volume-tab active';
+                document.getElementById('agentTabBuyer').className = 'volume-tab';
+                if (listings.length > 0) {
+                    renderAgentListings(listings);
+                } else {
+                    // No listings but has buyer deals — switch to buyer tab
+                    switchAgentListingTab('buyer');
+                }
             } catch (err) {
                 document.getElementById('agentListingsContainer').innerHTML =
                     '<div class="error-msg">Search failed: ' + err.message + '</div>';
@@ -2298,19 +2492,26 @@
             document.getElementById('clearAgentBtn').style.display = 'none';
             document.getElementById('agentDetail').className = 'agent-detail';
             document.getElementById('agentListingsCard').style.display = 'none';
+            document.getElementById('agentListingTabs').style.display = 'none';
+            agentBuyerDealsData = [];
+            agentActiveTab = 'listings';
         }
 
         function renderAgentDetail(listings, summary) {
-            const activeListings = listings.filter(l => l.status.startsWith('A'));
+            const activeListings = listings.filter(l => l.status && l.status.startsWith('A'));
             const soldListings = listings.filter(l => l.status === 'S' || l.status === 'H');
             const pendingListings = listings.filter(l => l.status === 'P' || l.status === 'US' || l.status === 'UNS');
 
-            const officeName = (summary && summary.office_name) || listings[0].list_office || '';
+            const officeName = (summary && summary.office_name) || (listings.length > 0 ? listings[0].list_office : '') || '';
 
             // Use summary stats (accurate totals from full DB) when available
             const totalActive = summary ? Number(summary.active_count) : activeListings.length;
             const totalSold = summary ? Number(summary.sold_count) : soldListings.length;
             const totalPending = summary ? Number(summary.pending_count) : pendingListings.length;
+
+            // Buyer-side stats from summary
+            const buyerSold = summary ? Number(summary.buyer_sold_count || 0) : 0;
+            const buyerVol = summary ? Number(summary.buyer_sold_volume || 0) : 0;
 
             // Volume: use summary sold volume when available (accurate across all listings)
             const activeVol = activeListings.reduce((s, l) => s + Number(l.current_price || 0), 0);
@@ -2336,6 +2537,20 @@
                 contactHtml += '</div>';
             }
 
+            // Buyer sub-labels (shown below listing-side stats when buyer data exists)
+            const buyerSoldSub = buyerSold > 0 ? `<div class="sub">${buyerSold} buyer</div>` : '';
+            const buyerVolSub = buyerVol > 0 ? `<div class="sub">${fmt$(buyerVol)} buyer</div>` : '';
+
+            // Combined total KPI (only show if there are buyer deals)
+            const totalDeals = totalSold + buyerSold;
+            const totalVol = soldVol + buyerVol;
+            const totalKpi = buyerSold > 0 ? `
+                        <div class="agent-kpi" style="border-left:1px solid var(--gray-200); padding-left:20px">
+                            <div class="val">${totalDeals}</div>
+                            <div class="lbl">Total Deals</div>
+                            <div class="sub">${fmt$(totalVol)}</div>
+                        </div>` : '';
+
             const panel = document.getElementById('agentDetail');
             panel.className = 'agent-detail visible';
             panel.innerHTML = `
@@ -2356,7 +2571,8 @@
                         </div>
                         <div class="agent-kpi">
                             <div class="val">${totalSold}</div>
-                            <div class="lbl">Sold</div>
+                            <div class="lbl">Sold (Listing)</div>
+                            ${buyerSoldSub}
                         </div>
                         <div class="agent-kpi">
                             <div class="val">${fmt$(activeVol)}</div>
@@ -2364,12 +2580,13 @@
                         </div>
                         <div class="agent-kpi">
                             <div class="val">${fmt$(soldVol)}</div>
-                            <div class="lbl">Sold Vol</div>
+                            <div class="lbl">Sold Vol (Listing)</div>
+                            ${buyerVolSub}
                         </div>
                         <div class="agent-kpi">
                             <div class="val">${avgDom}</div>
                             <div class="lbl">Avg DOM</div>
-                        </div>
+                        </div>${totalKpi}
                     </div>
                 </div>`;
         }
@@ -2487,6 +2704,82 @@
             </div>`;
         }
 
+        function switchAgentListingTab(tab) {
+            agentActiveTab = tab;
+            document.getElementById('agentTabListings').className = 'volume-tab' + (tab === 'listings' ? ' active' : '');
+            document.getElementById('agentTabBuyer').className = 'volume-tab' + (tab === 'buyer' ? ' active' : '');
+            if (tab === 'listings') {
+                renderAgentListings(agentListingsData);
+            } else {
+                renderAgentBuyerDeals(agentBuyerDealsData);
+            }
+        }
+
+        function renderAgentBuyerDeals(deals, page) {
+            agentBuyerDealsData = deals;
+            agentBuyerDealsPage = page || 0;
+
+            const total = deals.length;
+            const start = agentBuyerDealsPage * agentListingsPageSize;
+            const end = Math.min(start + agentListingsPageSize, total);
+            const pageDeals = deals.slice(start, end);
+            const totalPages = Math.ceil(total / agentListingsPageSize);
+            const currentPage = agentBuyerDealsPage + 1;
+
+            document.getElementById('agentListingsTitle').textContent =
+                'Buyer Deals (' + total + ')';
+
+            if (total === 0) {
+                document.getElementById('agentListingsContainer').innerHTML =
+                    '<div style="padding:20px; color:var(--gray-400); text-align:center">No buyer-side deals found</div>';
+                return;
+            }
+
+            const rows = pageDeals.map(d => {
+                return `
+                <tr>
+                    <td style="text-align:left">${statusBadge(d.status)}</td>
+                    <td style="text-align:left">${d.address || '\u2014'}</td>
+                    <td style="text-align:left">${d.city || ''}</td>
+                    <td><a class="mls-link" href="https://www.google.com/search?q=MLS+${d.mls_number}+Las+Vegas+NV" target="_blank" title="Search MLS# on Google">${d.mls_number}</a></td>
+                    <td>${fmtPrice(d.sold_price)}</td>
+                    <td>${fmt$(Number(d.price_per_sqft))}</td>
+                    <td>${d.beds || '\u2014'}/${d.baths || '\u2014'}</td>
+                    <td>${fmtN(d.sqft)}</td>
+                    <td>${d.dom != null ? d.dom : '\u2014'}</td>
+                    <td>${fmtDate(d.list_date)}</td>
+                    <td>${fmtDate(d.close_date)}</td>
+                    <td style="text-align:left; font-size:0.85em">${d.list_agent_name || '\u2014'}</td>
+                </tr>`;
+            }).join('');
+
+            document.getElementById('agentListingsContainer').innerHTML = `
+            <table>
+                <thead>
+                    <tr>
+                        <th style="text-align:left">Status</th>
+                        <th style="text-align:left">Address</th>
+                        <th style="text-align:left">City</th>
+                        <th>MLS#</th>
+                        <th>Sold Price</th>
+                        <th>$/SqFt</th>
+                        <th>Bd/Ba</th>
+                        <th>SqFt</th>
+                        <th>DOM</th>
+                        <th>Listed</th>
+                        <th>Closed</th>
+                        <th style="text-align:left">Listing Agent</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+            <div class="pagination">
+                <button class="btn btn-outline" onclick="renderAgentBuyerDeals(agentBuyerDealsData,${agentBuyerDealsPage - 1})" ${agentBuyerDealsPage === 0 ? 'disabled' : ''}>Prev</button>
+                <span>Showing ${start + 1}\u2013${end} of ${total} &nbsp; (Page ${currentPage} of ${totalPages})</span>
+                <button class="btn btn-outline" onclick="renderAgentBuyerDeals(agentBuyerDealsData,${agentBuyerDealsPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}>Next</button>
+            </div>`;
+        }
+
         // =====================================================================
         // Property Intelligence
         // =====================================================================
@@ -2495,8 +2788,8 @@
             if (!addr) return;
 
             document.getElementById('clearPropBtn').style.display = '';
-            document.getElementById('propertyHistoryCard').style.display = 'block';
-            document.getElementById('propertyHistoryContainer').innerHTML =
+            document.getElementById('cmaTabs').style.display = 'block';
+            document.getElementById('cmaContent').innerHTML =
                 '<div class="loading"><div class="spinner"></div>Searching...</div>';
 
             try {
@@ -2504,7 +2797,7 @@
                 if (error) throw error;
                 if (!data || data.length === 0) {
                     document.getElementById('propertyDetail').className = 'agent-detail';
-                    document.getElementById('propertyHistoryContainer').innerHTML =
+                    document.getElementById('cmaContent').innerHTML =
                         '<div style="padding:20px; color:var(--gray-400); text-align:center">No properties found for "' + addr + '"</div>';
                     return;
                 }
@@ -2524,7 +2817,7 @@
                     showPropertyPicker(parcels);
                 }
             } catch (err) {
-                document.getElementById('propertyHistoryContainer').innerHTML =
+                document.getElementById('cmaContent').innerHTML =
                     '<div class="error-msg">Search failed: ' + err.message + '</div>';
             }
         }
@@ -2559,7 +2852,7 @@
                 <h3 style="margin-bottom:12px">${Object.keys(parcels).length} Properties Found</h3>
                 <div class="prop-results">${items}</div>`;
 
-            document.getElementById('propertyHistoryCard').style.display = 'none';
+            document.getElementById('cmaTabs').style.display = 'none';
         }
 
         function showPropertyDetail(rows) {
@@ -2619,31 +2912,309 @@
                     <div class="prop-spec"><div class="val">${p.property_type || '—'}</div><div class="lbl">Type</div></div>
                 </div>`;
 
-            // Show listing history
+            // Store subject property for CMA
             const listingRows = rows.filter(r => r.mls_number);
-            if (listingRows.length === 0) {
-                document.getElementById('propertyHistoryCard').style.display = 'block';
-                document.getElementById('propertyHistoryContainer').innerHTML =
-                    '<div style="padding:20px; color:var(--gray-400); text-align:center">No listing history found</div>';
-                return;
-            }
-
-            document.getElementById('propertyHistoryCard').style.display = 'block';
             propHistoryData = listingRows;
             propHistorySqft = Number(p.sqft || 0);
-            renderPropertyHistory(0);
+
+            cmaParcelId = p.parcel_id;
+            cmaSubjectProperty = {
+                beds: p.beds, baths: p.baths, sqft: p.sqft,
+                year_built: p.year_built, subdivision: p.subdivision,
+                zip_code: p.zip_code,
+                current_price: latest ? Number(latest.current_price || 0) : 0,
+                price_per_sqft: (latest && p.sqft) ? Number(latest.current_price || 0) / Number(p.sqft) : 0
+            };
+
+            // Show CMA tabs and load default tab (sales)
+            document.getElementById('cmaTabs').style.display = 'block';
+            switchCmaTab('sales');
         }
 
         function renderPropertyHistory(page) {
+            // Redirect to CMA content area
+            renderPropertyHistoryInCma(page);
+        }
+
+        function clearPropertySearch() {
+            document.getElementById('propertySearch').value = '';
+            document.getElementById('clearPropBtn').style.display = 'none';
+            document.getElementById('propertyDetail').className = 'agent-detail';
+            document.getElementById('cmaTabs').style.display = 'none';
+            document.getElementById('gpsStatus').textContent = '';
+            cmaParcelId = null;
+            cmaSubjectProperty = null;
+            compData = [];
+        }
+
+        // =====================================================================
+        // GPS Locate Me
+        // =====================================================================
+        async function locateMe() {
+            const btn = document.getElementById('gpsBtn');
+            const status = document.getElementById('gpsStatus');
+
+            if (!navigator.geolocation) {
+                status.textContent = 'Geolocation not supported by this browser.';
+                return;
+            }
+
+            btn.classList.add('loading');
+            status.textContent = 'Getting location...';
+
+            navigator.geolocation.getCurrentPosition(
+                async (pos) => {
+                    const { latitude, longitude } = pos.coords;
+                    status.textContent = `Found: ${latitude.toFixed(5)}, ${longitude.toFixed(5)} — looking up address...`;
+                    try {
+                        const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`, {
+                            headers: { 'Accept-Language': 'en' }
+                        });
+                        const data = await resp.json();
+                        const addr = data.address;
+                        const street = (addr.house_number || '') + ' ' + (addr.road || '');
+                        if (!addr.road) {
+                            status.textContent = 'No street address found at this location.';
+                            btn.classList.remove('loading');
+                            return;
+                        }
+                        document.getElementById('propertySearch').value = street.trim();
+                        status.textContent = `Located: ${street.trim()}`;
+                        btn.classList.remove('loading');
+                        searchProperty();
+                    } catch (err) {
+                        status.textContent = 'Address lookup failed: ' + err.message;
+                        btn.classList.remove('loading');
+                    }
+                },
+                (err) => {
+                    btn.classList.remove('loading');
+                    const msgs = {
+                        1: 'Location permission denied. Allow location access and try again.',
+                        2: 'Location unavailable. Try again.',
+                        3: 'Location request timed out. Try again.'
+                    };
+                    status.textContent = msgs[err.code] || 'Location error.';
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+            );
+        }
+
+        // =====================================================================
+        // CMA Tab Switching
+        // =====================================================================
+        function switchCmaTab(tab) {
+            cmaTab = tab;
+            compPage = 0;
+
+            // Update tab UI
+            document.querySelectorAll('.cma-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.cma-tab').forEach(t => {
+                if ((tab === 'sales' && t.textContent.includes('Sales')) ||
+                    (tab === 'active' && t.textContent.includes('Active')) ||
+                    (tab === 'history' && t.textContent.includes('History')))
+                    t.classList.add('active');
+            });
+
+            const filterBar = document.getElementById('compFilterBar');
+            const summary = document.getElementById('compSummary');
+
+            if (tab === 'history') {
+                filterBar.style.display = 'none';
+                summary.innerHTML = '';
+                renderPropertyHistory(0);
+            } else {
+                filterBar.style.display = 'flex';
+                loadComps();
+            }
+        }
+
+        // =====================================================================
+        // Load Comps from Supabase
+        // =====================================================================
+        async function loadComps() {
+            if (!cmaParcelId) return;
+
+            const compType = cmaTab === 'sales' ? 'sold' : 'active';
+            const tightness = document.getElementById('compTightness').value;
+            const container = document.getElementById('cmaContent');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading comps...</div>';
+            document.getElementById('compSummary').innerHTML = '';
+            document.getElementById('compCount').textContent = '';
+
+            try {
+                const { data, error } = await sb.rpc('get_property_comps', {
+                    p_parcel_id: cmaParcelId,
+                    p_comp_type: compType,
+                    p_tightness: tightness,
+                    p_limit: compPageSize,
+                    p_offset: compPage * compPageSize
+                });
+                if (error) throw error;
+
+                compData = data || [];
+                const totalCount = compData.length > 0 ? Number(compData[0].total_count) : 0;
+                document.getElementById('compCount').textContent = totalCount + ' comps found';
+
+                renderCompSummary(compData, totalCount, compType);
+                renderCompTable(compData, totalCount, compType);
+            } catch (err) {
+                container.innerHTML = '<div class="error-msg">Failed to load comps: ' + err.message + '</div>';
+            }
+        }
+
+        // =====================================================================
+        // Render Comp KPI Summary
+        // =====================================================================
+        function renderCompSummary(data, totalCount, compType) {
+            const summary = document.getElementById('compSummary');
+            if (!data || data.length === 0) {
+                summary.innerHTML = '';
+                return;
+            }
+
+            // Calculate averages
+            let sumPrice = 0, sumPpsf = 0, sumDom = 0, countPrice = 0, countPpsf = 0, countDom = 0;
+            data.forEach(r => {
+                const price = compType === 'sold' ? Number(r.sold_price || r.current_price || 0) : Number(r.current_price || 0);
+                if (price > 0) { sumPrice += price; countPrice++; }
+                const ppsf = Number(r.price_per_sqft || 0);
+                if (ppsf > 0) { sumPpsf += ppsf; countPpsf++; }
+                const dom = Number(r.dom);
+                if (dom != null && !isNaN(dom)) { sumDom += dom; countDom++; }
+            });
+
+            const avgPrice = countPrice > 0 ? sumPrice / countPrice : 0;
+            const avgPpsf = countPpsf > 0 ? sumPpsf / countPpsf : 0;
+            const avgDom = countDom > 0 ? sumDom / countDom : 0;
+
+            // Compare with subject
+            const subj = cmaSubjectProperty;
+            let priceVs = '', ppsfVs = '';
+            if (subj && subj.current_price > 0 && avgPrice > 0) {
+                const diff = subj.current_price - avgPrice;
+                const sign = diff > 0 ? '+' : '';
+                const cls = diff > 0 ? 'over-market' : diff < 0 ? 'under-market' : 'at-market';
+                priceVs = `<div class="vs ${cls}">Subject: ${sign}${fmt$(diff)}</div>`;
+            }
+            if (subj && subj.price_per_sqft > 0 && avgPpsf > 0) {
+                const diff = Math.round(subj.price_per_sqft - avgPpsf);
+                const sign = diff > 0 ? '+' : '';
+                const cls = diff > 0 ? 'over-market' : diff < 0 ? 'under-market' : 'at-market';
+                ppsfVs = `<div class="vs ${cls}">Subject: ${sign}$${diff}/sf</div>`;
+            }
+
+            // Sold-to-list for sold comps
+            let stlKpi = '';
+            if (compType === 'sold') {
+                let sumStl = 0, countStl = 0;
+                data.forEach(r => {
+                    const stl = Number(r.sold_to_list_pct || 0);
+                    if (stl > 50 && stl < 150) { sumStl += stl; countStl++; }
+                });
+                const avgStl = countStl > 0 ? (sumStl / countStl).toFixed(1) : '—';
+                stlKpi = `<div class="comp-kpi"><div class="val">${avgStl}%</div><div class="lbl">Avg S/L Ratio</div></div>`;
+            }
+
+            summary.innerHTML = `
+                <div class="comp-kpis">
+                    <div class="comp-kpi"><div class="val">${totalCount}</div><div class="lbl">Comps Found</div></div>
+                    <div class="comp-kpi"><div class="val">${fmt$(avgPrice)}</div><div class="lbl">Avg Price</div>${priceVs}</div>
+                    <div class="comp-kpi"><div class="val">$${Math.round(avgPpsf)}</div><div class="lbl">Avg $/SqFt</div>${ppsfVs}</div>
+                    <div class="comp-kpi"><div class="val">${Math.round(avgDom)}</div><div class="lbl">Avg DOM</div></div>
+                    ${stlKpi}
+                </div>`;
+        }
+
+        // =====================================================================
+        // Render Comp Table
+        // =====================================================================
+        function renderCompTable(data, totalCount, compType) {
+            const container = document.getElementById('cmaContent');
+
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div style="padding:20px; color:var(--gray-400); text-align:center">No comps found. Try widening the match filter.</div>';
+                return;
+            }
+
+            const isSold = compType === 'sold';
+            const rows = data.map(r => {
+                const price = isSold ? fmtPrice(r.sold_price || r.current_price) : fmtPrice(r.current_price);
+                const ppsf = r.price_per_sqft ? '$' + Math.round(Number(r.price_per_sqft)) : '—';
+                const matchCls = r.match_quality === 'subdivision' ? 'sub' : 'zip';
+                const matchLabel = r.match_quality === 'subdivision' ? 'SUB' : 'ZIP';
+                const dateCol = isSold ? fmtDate(r.close_date) : fmtDate(r.list_date);
+                const stl = isSold && r.sold_to_list_pct ? r.sold_to_list_pct + '%' : '—';
+
+                return `<tr>
+                    <td style="text-align:left"><span class="match-badge ${matchCls}">${matchLabel}</span></td>
+                    <td style="text-align:left">${r.address || '—'}</td>
+                    <td style="text-align:left">${statusBadge(r.status)}</td>
+                    <td>${price}</td>
+                    <td>${ppsf}</td>
+                    <td>${r.beds || '—'}/${r.baths || '—'}</td>
+                    <td>${fmtN(r.sqft)}</td>
+                    <td>${r.dom != null ? r.dom : '—'}</td>
+                    <td>${dateCol}</td>
+                    <td>${stl}</td>
+                    <td style="text-align:left">${r.list_agent_name || '—'}</td>
+                </tr>`;
+            }).join('');
+
+            const totalPages = Math.ceil(totalCount / compPageSize);
+            const currentPage = compPage + 1;
+            const start = compPage * compPageSize;
+            const end = Math.min(start + data.length, totalCount);
+            let paginationHtml = '';
+            if (totalPages > 1) {
+                paginationHtml = `
+                <div class="pagination">
+                    <button class="btn btn-outline" onclick="compPage--;loadComps()" ${compPage === 0 ? 'disabled' : ''}>Prev</button>
+                    <span>Showing ${start + 1}\u2013${end} of ${totalCount} &nbsp; (Page ${currentPage} of ${totalPages})</span>
+                    <button class="btn btn-outline" onclick="compPage++;loadComps()" ${currentPage >= totalPages ? 'disabled' : ''}>Next</button>
+                </div>`;
+            }
+
+            container.innerHTML = `
+            <table>
+                <thead>
+                    <tr>
+                        <th style="text-align:left">Match</th>
+                        <th style="text-align:left">Address</th>
+                        <th style="text-align:left">Status</th>
+                        <th>Price</th>
+                        <th>$/SqFt</th>
+                        <th>Bd/Ba</th>
+                        <th>SqFt</th>
+                        <th>DOM</th>
+                        <th>${isSold ? 'Closed' : 'Listed'}</th>
+                        <th>S/L%</th>
+                        <th style="text-align:left">Agent</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+            ${paginationHtml}`;
+        }
+
+        // =====================================================================
+        // Render Property History (redirected to CMA content area)
+        // =====================================================================
+        function renderPropertyHistoryInCma(page) {
             propHistoryPage = page;
+            const container = document.getElementById('cmaContent');
             const total = propHistoryData.length;
+
+            if (total === 0) {
+                container.innerHTML = '<div style="padding:20px; color:var(--gray-400); text-align:center">No listing history found</div>';
+                return;
+            }
+
             const start = propHistoryPage * propHistoryPageSize;
             const end = Math.min(start + propHistoryPageSize, total);
             const pageListings = propHistoryData.slice(start, end);
             const totalPages = Math.ceil(total / propHistoryPageSize);
             const currentPage = propHistoryPage + 1;
-
-            document.getElementById('propertyHistoryTitle').textContent = 'Listing History (' + total + ')';
 
             const histRows = pageListings.map(l => {
                 const price = l.status === 'S' || l.status === 'H'
@@ -2696,13 +3267,13 @@
             if (totalPages > 1) {
                 paginationHtml = `
                 <div class="pagination">
-                    <button class="btn btn-outline" onclick="renderPropertyHistory(${propHistoryPage - 1})" ${propHistoryPage === 0 ? 'disabled' : ''}>Prev</button>
+                    <button class="btn btn-outline" onclick="renderPropertyHistoryInCma(${propHistoryPage - 1})" ${propHistoryPage === 0 ? 'disabled' : ''}>Prev</button>
                     <span>Showing ${start + 1}\u2013${end} of ${total} &nbsp; (Page ${currentPage} of ${totalPages})</span>
-                    <button class="btn btn-outline" onclick="renderPropertyHistory(${propHistoryPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}>Next</button>
+                    <button class="btn btn-outline" onclick="renderPropertyHistoryInCma(${propHistoryPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}>Next</button>
                 </div>`;
             }
 
-            document.getElementById('propertyHistoryContainer').innerHTML = `
+            container.innerHTML = `
             <table>
                 <thead>
                     <tr>
@@ -2728,13 +3299,6 @@
                 <span class="under-market">Green = under market</span> &nbsp;
                 (Active listings shown in bold, historical in gray)
             </div>`;
-        }
-
-        function clearPropertySearch() {
-            document.getElementById('propertySearch').value = '';
-            document.getElementById('clearPropBtn').style.display = 'none';
-            document.getElementById('propertyDetail').className = 'agent-detail';
-            document.getElementById('propertyHistoryCard').style.display = 'none';
         }
 
         // =====================================================================
