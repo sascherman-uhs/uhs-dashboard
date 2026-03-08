@@ -474,6 +474,41 @@
             margin-top: 2px;
         }
 
+        /* Indicated Value highlight KPI */
+        .comp-kpi.indicated {
+            background: var(--navy);
+            color: var(--white);
+            border-color: var(--navy);
+            grid-column: 1 / -1;
+        }
+        .comp-kpi.indicated .val { color: var(--gold); font-size: 28px; }
+        .comp-kpi.indicated .lbl { color: var(--gold-light); }
+        .comp-kpi.indicated .vs { color: var(--gray-400); }
+
+        /* Estimate link buttons */
+        .estimate-links {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        .estimate-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: 4px;
+            text-decoration: none;
+            border: 1px solid var(--gray-200);
+            color: var(--gray-600);
+            background: var(--white);
+            transition: all 0.2s;
+        }
+        .estimate-link:hover { border-color: var(--gold); color: var(--navy); background: #fffbf0; }
+        .estimate-link svg { width: 12px; height: 12px; }
+
         /* Property detail card */
         .prop-specs {
             display: grid;
@@ -767,7 +802,7 @@
         }
         .drilldown-close:hover { background: var(--gray-50); border-color: var(--gray-400); }
 
-        /* Redfin link styling */
+        /* Address link styling */
         a.redfin-link {
             color: var(--navy);
             text-decoration: none;
@@ -1960,9 +1995,10 @@
         // =====================================================================
         // Price Range Drill-Down
         // =====================================================================
-        function redfinUrl(address, city) {
-            const q = encodeURIComponent((address || '') + ', ' + (city || 'Las Vegas') + ', NV');
-            return 'https://www.redfin.com/search#query=' + q;
+        function zillowUrl(address, city) {
+            const slug = (address || '').replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '')
+                + '-' + (city || 'Las-Vegas').replace(/\s+/g, '-') + '-NV';
+            return 'https://www.zillow.com/homes/' + encodeURIComponent(slug) + '_rb/';
         }
 
         async function loadPriceRangeListings(rangeLabel, statusType, page) {
@@ -2043,7 +2079,7 @@
                 return `
                 <tr>
                     <td style="text-align:left">${statusBadge(l.status)}</td>
-                    <td style="text-align:left"><a class="redfin-link" href="${redfinUrl(l.address, l.city)}" target="_blank" title="View on Redfin">${l.address || '—'}</a></td>
+                    <td style="text-align:left"><a class="redfin-link" href="${zillowUrl(l.address, l.city)}" target="_blank" title="View on Zillow">${l.address || '—'}</a></td>
                     <td><a class="mls-link" href="https://www.google.com/search?q=MLS+${l.mls_number}+Las+Vegas+NV" target="_blank">${l.mls_number}</a></td>
                     <td>${price}</td>
                     <td>${ppsf ? '$' + Math.round(ppsf) : '—'}</td>
@@ -2090,7 +2126,7 @@
                 <button class="btn btn-outline" onclick="loadPriceRangeListings('${currentDrilldownRange.replace(/'/g, "\\'")}','${currentDrilldownStatus}',${priceRangePage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}>Next</button>
             </div>
             <div style="font-size:11px; color:var(--gray-400); margin-top:6px">
-                Addresses link to Redfin. MLS# links to Google.
+                Addresses link to Zillow. MLS# links to Google.
                 <span class="over-market">Red = over market avg</span> &nbsp;
                 <span class="under-market">Green = under market avg</span> &nbsp;
                 Hidden = actual days on market from prior withdrawn/expired listing on same parcel (multiplier vs reported DOM)
@@ -2891,6 +2927,17 @@
                 agentHtml += '</div>';
             }
 
+            // Zillow + Google estimate links (no login required)
+            const addrSlug = (p.address || '').replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
+            const citySlug = (p.city || 'Las-Vegas').replace(/\s+/g, '-');
+            const zillowUrl = `https://www.zillow.com/homes/${encodeURIComponent(addrSlug + '-' + citySlug + '-NV')}_rb/`;
+            const googleUrl = `https://www.google.com/search?q=${encodeURIComponent((p.address || '') + ' ' + (p.city || 'Las Vegas') + ' NV home value')}`;
+            const extIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>';
+            const estimateHtml = `<div class="estimate-links">
+                <a href="${zillowUrl}" target="_blank" class="estimate-link">${extIcon} Zillow</a>
+                <a href="${googleUrl}" target="_blank" class="estimate-link">${extIcon} Google</a>
+            </div>`;
+
             panel.innerHTML = `
                 <div class="agent-detail-header">
                     <div>
@@ -2899,6 +2946,7 @@
                         <div class="contact-line">${statusLabel} &nbsp; ${currentPrice}</div>
                         ${mktHtml}
                         ${agentHtml}
+                        ${estimateHtml}
                     </div>
                 </div>
                 <div class="prop-specs">
@@ -2922,6 +2970,7 @@
                 beds: p.beds, baths: p.baths, sqft: p.sqft,
                 year_built: p.year_built, subdivision: p.subdivision,
                 zip_code: p.zip_code,
+                pool: p.pool, garage_spaces: p.garage_spaces, lot_sqft: p.lot_sqft,
                 current_price: latest ? Number(latest.current_price || 0) : 0,
                 price_per_sqft: (latest && p.sqft) ? Number(latest.current_price || 0) / Number(p.sqft) : 0
             };
@@ -2965,25 +3014,45 @@
             navigator.geolocation.getCurrentPosition(
                 async (pos) => {
                     const { latitude, longitude } = pos.coords;
-                    status.textContent = `Found: ${latitude.toFixed(5)}, ${longitude.toFixed(5)} — looking up address...`;
+                    const accuracy = Math.round(pos.coords.accuracy);
+                    status.textContent = `Found: ${latitude.toFixed(5)}, ${longitude.toFixed(5)} (±${accuracy}m) — searching nearby...`;
                     try {
+                        // Get street name from Nominatim for a database search term
                         const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`, {
                             headers: { 'Accept-Language': 'en' }
                         });
                         const data = await resp.json();
                         const addr = data.address;
-                        const street = (addr.house_number || '') + ' ' + (addr.road || '');
-                        if (!addr.road) {
-                            status.textContent = 'No street address found at this location.';
+                        const road = addr.road || '';
+                        if (!road) {
+                            status.textContent = 'No street found at this location. Try typing the address.';
                             btn.classList.remove('loading');
                             return;
                         }
-                        document.getElementById('propertySearch').value = street.trim();
-                        status.textContent = `Located: ${street.trim()}`;
+
+                        // Search our database for properties on this street
+                        const { data: results, error } = await sb.rpc('search_property', { p_address: road });
                         btn.classList.remove('loading');
-                        searchProperty();
+                        if (error) throw error;
+                        if (!results || results.length === 0) {
+                            status.textContent = `No properties found on "${road}". Try typing the address.`;
+                            return;
+                        }
+
+                        // Group by parcel_id and sort by address proximity to GPS coords
+                        const parcels = {};
+                        results.forEach(r => {
+                            if (!parcels[r.parcel_id]) parcels[r.parcel_id] = [];
+                            parcels[r.parcel_id].push(r);
+                        });
+
+                        // Show top 8 as a picker with the nearest address highlighted
+                        const parcelIds = Object.keys(parcels).slice(0, 8);
+                        status.textContent = `${parcelIds.length} properties on ${road} — select yours:`;
+                        window.propSearchResults = parcels;
+                        showGpsPicker(parcels, parcelIds, road);
                     } catch (err) {
-                        status.textContent = 'Address lookup failed: ' + err.message;
+                        status.textContent = 'Lookup failed: ' + err.message;
                         btn.classList.remove('loading');
                     }
                 },
@@ -2998,6 +3067,39 @@
                 },
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
             );
+        }
+
+        function showGpsPicker(parcels, parcelIds, streetName) {
+            const panel = document.getElementById('propertyDetail');
+            panel.className = 'agent-detail visible';
+            document.getElementById('clearPropBtn').style.display = '';
+            document.getElementById('propertySearch').value = streetName;
+
+            let items = '';
+            for (const pid of parcelIds) {
+                const rows = parcels[pid];
+                const p = rows[0];
+                const latest = rows.find(r => r.mls_number);
+                const statusLabel = latest ? statusBadge(latest.status) : '<span class="status-badge status-other">No Listings</span>';
+                const priceLabel = latest ? fmtPrice(latest.current_price) : '';
+                items += `
+                    <div class="prop-result-item" onclick="showPropertyDetail(propSearchResults['${pid}'])">
+                        <div>
+                            <div class="addr">${p.address}</div>
+                            <div class="meta">${p.city || ''} ${p.zip_code || ''} &bull; ${p.beds || '?'}bd/${p.baths || '?'}ba &bull; ${fmtN(p.sqft)} sqft</div>
+                        </div>
+                        <div style="text-align:right">
+                            ${statusLabel}
+                            <div class="meta">${priceLabel}</div>
+                        </div>
+                    </div>`;
+            }
+
+            panel.innerHTML = `
+                <h3 style="margin-bottom:12px">Select Your Property on ${streetName}</h3>
+                <div class="prop-results">${items}</div>`;
+
+            document.getElementById('cmaTabs').style.display = 'none';
         }
 
         // =====================================================================
@@ -3064,6 +3166,101 @@
         }
 
         // =====================================================================
+        // Appraisal-Style Indicated Value Calculation
+        // =====================================================================
+        const ADJ_FACTORS = {
+            sqft: 30,          // $/sqft difference
+            pool: 15000,       // pool yes/no
+            garage: 10000,     // per garage space
+            lot_sqft: 5,       // $/sqft lot difference (capped ±$25K)
+            lot_cap: 25000,    // max lot adjustment
+            age: 1500          // $/year difference
+        };
+
+        function calculateCompAdjustment(comp, subject) {
+            if (!subject) return { adjusted: 0, net: 0, details: {} };
+            const soldPrice = Number(comp.sold_price || comp.current_price || 0);
+            if (soldPrice <= 0) return { adjusted: 0, net: 0, details: {} };
+
+            const details = {};
+            let net = 0;
+
+            // SqFt: if comp is smaller, it sold for less → add to comp price
+            const subjSqft = Number(subject.sqft || 0);
+            const compSqft = Number(comp.sqft || 0);
+            if (subjSqft > 0 && compSqft > 0) {
+                details.sqft = (subjSqft - compSqft) * ADJ_FACTORS.sqft;
+                net += details.sqft;
+            }
+
+            // Pool: subject has pool but comp doesn't → add value
+            const subjPool = !!subject.pool;
+            const compPool = !!comp.pool;
+            if (subjPool !== compPool) {
+                details.pool = subjPool ? ADJ_FACTORS.pool : -ADJ_FACTORS.pool;
+                net += details.pool;
+            }
+
+            // Garage: per space difference
+            const subjGarage = Number(subject.garage_spaces || 0);
+            const compGarage = Number(comp.garage_spaces || 0);
+            if (subjGarage !== compGarage) {
+                details.garage = (subjGarage - compGarage) * ADJ_FACTORS.garage;
+                net += details.garage;
+            }
+
+            // Lot size
+            const subjLot = Number(subject.lot_sqft || 0);
+            const compLot = Number(comp.lot_sqft || 0);
+            if (subjLot > 0 && compLot > 0) {
+                let lotAdj = (subjLot - compLot) * ADJ_FACTORS.lot_sqft;
+                lotAdj = Math.max(-ADJ_FACTORS.lot_cap, Math.min(ADJ_FACTORS.lot_cap, lotAdj));
+                details.lot = lotAdj;
+                net += details.lot;
+            }
+
+            // Age: newer = more valuable → if subject newer, add to comp
+            const subjYear = Number(subject.year_built || 0);
+            const compYear = Number(comp.year_built || 0);
+            if (subjYear > 0 && compYear > 0) {
+                details.age = (subjYear - compYear) * ADJ_FACTORS.age;
+                net += details.age;
+            }
+
+            return { adjusted: soldPrice + net, net, details };
+        }
+
+        function calculateIndicatedValue(data, subject) {
+            if (!data || data.length === 0 || !subject) return null;
+
+            let weightedSum = 0, weightTotal = 0, compCount = 0;
+            const adjustments = [];
+
+            data.forEach(r => {
+                const soldPrice = Number(r.sold_price || 0);
+                if (soldPrice <= 0) return;
+
+                const adj = calculateCompAdjustment(r, subject);
+                if (adj.adjusted <= 0) return;
+
+                // Weight: fewer adjustments = higher weight
+                const absAdj = Math.abs(adj.net);
+                const weight = 1 / (1 + absAdj / soldPrice);
+                weightedSum += adj.adjusted * weight;
+                weightTotal += weight;
+                compCount++;
+                adjustments.push({ ...adj, weight, soldPrice });
+            });
+
+            if (compCount === 0) return null;
+            return {
+                value: Math.round(weightedSum / weightTotal),
+                compCount,
+                adjustments
+            };
+        }
+
+        // =====================================================================
         // Render Comp KPI Summary
         // =====================================================================
         function renderCompSummary(data, totalCount, compType) {
@@ -3116,8 +3313,31 @@
                 stlKpi = `<div class="comp-kpi"><div class="val">${avgStl}%</div><div class="lbl">Avg S/L Ratio</div></div>`;
             }
 
+            // Indicated Value (sold comps only)
+            let indicatedHtml = '';
+            if (compType === 'sold') {
+                const iv = calculateIndicatedValue(data, cmaSubjectProperty);
+                if (iv) {
+                    let vsListHtml = '';
+                    const subj = cmaSubjectProperty;
+                    if (subj && subj.current_price > 0) {
+                        const diff = iv.value - subj.current_price;
+                        const pct = ((diff / subj.current_price) * 100).toFixed(1);
+                        const sign = diff >= 0 ? '+' : '';
+                        vsListHtml = `<div class="vs">vs List: ${sign}${fmt$(diff)} (${sign}${pct}%)</div>`;
+                    }
+                    indicatedHtml = `<div class="comp-kpi indicated">
+                        <div class="val">${fmtPrice(iv.value)}</div>
+                        <div class="lbl">Indicated Value</div>
+                        <div class="vs" style="color:var(--gray-400)">Based on ${iv.compCount} adjusted comps</div>
+                        ${vsListHtml}
+                    </div>`;
+                }
+            }
+
             summary.innerHTML = `
                 <div class="comp-kpis">
+                    ${indicatedHtml}
                     <div class="comp-kpi"><div class="val">${totalCount}</div><div class="lbl">Comps Found</div></div>
                     <div class="comp-kpi"><div class="val">${fmt$(avgPrice)}</div><div class="lbl">Avg Price</div>${priceVs}</div>
                     <div class="comp-kpi"><div class="val">$${Math.round(avgPpsf)}</div><div class="lbl">Avg $/SqFt</div>${ppsfVs}</div>
@@ -3146,8 +3366,21 @@
                 const dateCol = isSold ? fmtDate(r.close_date) : fmtDate(r.list_date);
                 const stl = isSold && r.sold_to_list_pct ? r.sold_to_list_pct + '%' : '—';
 
-                const redfin = r.address && r.city ? `https://www.redfin.com/search#query=${encodeURIComponent(r.address + ', ' + r.city + ', NV')}` : null;
-                const addrHtml = redfin ? `<a href="${redfin}" target="_blank" style="color:var(--navy);text-decoration:none;border-bottom:1px dashed var(--gray-400)">${r.address}</a>` : (r.address || '—');
+                const zillowLink = r.address && r.city ? `https://www.zillow.com/homes/${encodeURIComponent((r.address || '').replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '') + '-' + (r.city || '').replace(/\s+/g, '-') + '-NV')}_rb/` : null;
+                const addrHtml = zillowLink ? `<a href="${zillowLink}" target="_blank" style="color:var(--navy);text-decoration:none;border-bottom:1px dashed var(--gray-400)">${r.address}</a>` : (r.address || '—');
+
+                // Per-comp adjustment (sold only)
+                let adjHtml = '';
+                if (isSold) {
+                    const adj = calculateCompAdjustment(r, cmaSubjectProperty);
+                    if (adj.net !== 0) {
+                        const sign = adj.net > 0 ? '+' : '';
+                        const cls = adj.net > 0 ? 'under-market' : 'over-market';
+                        adjHtml = `<td class="${cls}">${sign}${fmt$(adj.net)}</td>`;
+                    } else {
+                        adjHtml = '<td style="color:var(--gray-400)">—</td>';
+                    }
+                }
 
                 return `<tr>
                     <td style="text-align:left"><span class="match-badge ${matchCls}">${matchLabel}</span></td>
@@ -3160,6 +3393,7 @@
                     <td>${r.dom != null ? r.dom : '—'}</td>
                     <td>${dateCol}</td>
                     <td>${stl}</td>
+                    ${adjHtml}
                     <td style="text-align:left">${r.list_agent_name || '—'}</td>
                 </tr>`;
             }).join('');
@@ -3192,6 +3426,7 @@
                         <th>DOM</th>
                         <th>${isSold ? 'Closed' : 'Listed'}</th>
                         <th>S/L%</th>
+                        ${isSold ? '<th>Adj</th>' : ''}
                         <th style="text-align:left">Agent</th>
                     </tr>
                 </thead>
