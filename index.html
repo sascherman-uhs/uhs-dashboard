@@ -3382,9 +3382,18 @@
                     }
                 }
 
+                // Neighborhood: highlight if different from subject
+                const subjSub = (cmaSubjectProperty && cmaSubjectProperty.subdivision || '').toUpperCase().trim();
+                const compSub = (r.subdivision || '').trim();
+                const compSubUpper = compSub.toUpperCase();
+                const sameNeighborhood = subjSub && compSubUpper && subjSub === compSubUpper;
+                const neighStyle = sameNeighborhood ? 'color:var(--green);font-weight:600' : 'color:var(--gray-600);font-size:11px';
+                const neighHtml = compSub ? `<span style="${neighStyle}">${compSub}</span>` : '<span style="color:var(--gray-400)">—</span>';
+
                 return `<tr>
                     <td style="text-align:left"><span class="match-badge ${matchCls}">${matchLabel}</span></td>
                     <td style="text-align:left">${addrHtml}</td>
+                    <td style="text-align:left;white-space:nowrap">${neighHtml}</td>
                     <td style="text-align:left">${statusBadge(r.status)}</td>
                     <td>${price}</td>
                     <td>${ppsf}</td>
@@ -3418,6 +3427,7 @@
                     <tr>
                         <th style="text-align:left">Match</th>
                         <th style="text-align:left">Address</th>
+                        <th style="text-align:left">Neighborhood</th>
                         <th style="text-align:left">Status</th>
                         <th>Price</th>
                         <th>$/SqFt</th>
