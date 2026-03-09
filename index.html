@@ -321,6 +321,38 @@
         }
 
         /* Status badges */
+        /* Prominent listing status banner */
+        .listing-status-banner {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin: 8px 0 12px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+        }
+        .listing-status-banner .status-name {
+            font-size: 18px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .listing-status-banner .status-price {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        .listing-status-banner .status-detail {
+            font-size: 12px;
+            opacity: 0.85;
+            width: 100%;
+        }
+        .listing-status-banner.banner-active { background: #dcfce7; color: #166534; }
+        .listing-status-banner.banner-pending { background: #fef3c7; color: #92400e; }
+        .listing-status-banner.banner-sold { background: #dbeafe; color: #1e40af; }
+        .listing-status-banner.banner-withdrawn { background: #fee2e2; color: #991b1b; }
+        .listing-status-banner.banner-expired { background: #fde8e8; color: #7f1d1d; }
+        .listing-status-banner.banner-other { background: var(--gray-100); color: var(--gray-600); }
+
         .status-badge {
             display: inline-block;
             padding: 2px 8px;
@@ -2898,8 +2930,78 @@
 
             // Current status from most recent listing
             const latest = rows.find(r => r.mls_number);
-            const statusLabel = latest ? statusBadge(latest.status) : '<span class="status-badge status-other">No Active Listing</span>';
-            const currentPrice = latest ? fmtPrice(latest.current_price) : '—';
+
+            // Build prominent status banner
+            let bannerHtml = '';
+            if (latest) {
+                const st = (latest.status || '').toUpperCase();
+                let statusName, bannerCls, priceLabel, priceVal, detailParts = [];
+
+                if (st.startsWith('A')) {
+                    statusName = 'Active on MLS';
+                    bannerCls = 'banner-active';
+                    priceLabel = 'List Price';
+                    priceVal = fmtPrice(latest.current_price);
+                    if (latest.dom != null) detailParts.push(latest.dom + ' days on market');
+                    if (latest.list_date) detailParts.push('Listed ' + fmtDate(latest.list_date));
+                    if (latest.original_list_price && latest.current_price && Number(latest.original_list_price) !== Number(latest.current_price)) {
+                        detailParts.push('Original: ' + fmtPrice(latest.original_list_price));
+                    }
+                } else if (st === 'P' || st === 'US' || st === 'UNS' || st === 'UCS' || st === 'UCNS' || st === 'COS' || st === 'CSL') {
+                    const ucNames = { P: 'Pending', US: 'Under Contract (Showing)', UNS: 'Under Contract (No Show)',
+                        UCS: 'Under Contract (Showing)', UCNS: 'Under Contract (No Show)', COS: 'Contingent (Showing)', CSL: 'Contingent' };
+                    statusName = ucNames[st] || 'Under Contract';
+                    bannerCls = 'banner-pending';
+                    priceLabel = 'List Price';
+                    priceVal = fmtPrice(latest.current_price);
+                    if (latest.acceptance_date) detailParts.push('Accepted ' + fmtDate(latest.acceptance_date));
+                    if (latest.list_date) detailParts.push('Listed ' + fmtDate(latest.list_date));
+                    if (latest.dom != null) detailParts.push(latest.dom + ' DOM');
+                } else if (st === 'S' || st === 'H') {
+                    statusName = 'Sold';
+                    bannerCls = 'banner-sold';
+                    priceLabel = 'Sold Price';
+                    priceVal = fmtPrice(latest.sold_price || latest.current_price);
+                    if (latest.close_date) detailParts.push('Closed ' + fmtDate(latest.close_date));
+                    if (latest.current_price && latest.sold_price) {
+                        const stl = ((Number(latest.sold_price) / Number(latest.current_price)) * 100).toFixed(1);
+                        detailParts.push('S/L: ' + stl + '%');
+                    }
+                    if (latest.current_price) detailParts.push('List: ' + fmtPrice(latest.current_price));
+                    if (latest.dom != null) detailParts.push(latest.dom + ' DOM');
+                } else if (st === 'W' || st === 'WC') {
+                    statusName = 'Withdrawn';
+                    bannerCls = 'banner-withdrawn';
+                    priceLabel = 'Last List Price';
+                    priceVal = fmtPrice(latest.current_price);
+                    if (latest.list_date) detailParts.push('Listed ' + fmtDate(latest.list_date));
+                    if (latest.dom != null) detailParts.push(latest.dom + ' DOM before withdrawal');
+                } else if (st === 'X' || st === 'TOM') {
+                    statusName = st === 'X' ? 'Expired' : 'Temp Off Market';
+                    bannerCls = 'banner-expired';
+                    priceLabel = 'Last List Price';
+                    priceVal = fmtPrice(latest.current_price);
+                    if (latest.list_date) detailParts.push('Listed ' + fmtDate(latest.list_date));
+                    if (latest.dom != null) detailParts.push(latest.dom + ' DOM');
+                } else {
+                    statusName = st;
+                    bannerCls = 'banner-other';
+                    priceLabel = 'Price';
+                    priceVal = fmtPrice(latest.current_price);
+                }
+
+                if (latest.mls_number) detailParts.push('MLS# ' + latest.mls_number);
+
+                bannerHtml = `<div class="listing-status-banner ${bannerCls}">
+                    <span class="status-name">${statusName}</span>
+                    <span class="status-price">${priceVal}</span>
+                    <div class="status-detail">${detailParts.join(' &bull; ')}</div>
+                </div>`;
+            } else {
+                bannerHtml = `<div class="listing-status-banner banner-other">
+                    <span class="status-name">No MLS Listing Found</span>
+                </div>`;
+            }
 
             // Market comparison
             let mktHtml = '';
@@ -2943,7 +3045,7 @@
                     <div>
                         <h3>${p.address}</h3>
                         <div class="office">${p.city || ''}, ${p.zip_code || ''} &bull; ${p.subdivision || ''}</div>
-                        <div class="contact-line">${statusLabel} &nbsp; ${currentPrice}</div>
+                        ${bannerHtml}
                         ${mktHtml}
                         ${agentHtml}
                         ${estimateHtml}
