@@ -2963,11 +2963,11 @@
                     priceLabel = 'Sold Price';
                     priceVal = fmtPrice(latest.sold_price || latest.current_price);
                     if (latest.close_date) detailParts.push('Closed ' + fmtDate(latest.close_date));
-                    if (latest.current_price && latest.sold_price) {
-                        const stl = ((Number(latest.sold_price) / Number(latest.current_price)) * 100).toFixed(1);
+                    if (latest.original_list_price && latest.sold_price) {
+                        const stl = ((Number(latest.sold_price) / Number(latest.original_list_price)) * 100).toFixed(1);
                         detailParts.push('S/L: ' + stl + '%');
                     }
-                    if (latest.current_price) detailParts.push('List: ' + fmtPrice(latest.current_price));
+                    if (latest.original_list_price) detailParts.push('List: ' + fmtPrice(latest.original_list_price));
                     if (latest.dom != null) detailParts.push(latest.dom + ' DOM');
                 } else if (st === 'W' || st === 'WC') {
                     statusName = 'Withdrawn';
