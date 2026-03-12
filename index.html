@@ -1238,6 +1238,44 @@
                 </div>
             </div>
         </div>
+
+        <!-- Staging Opportunities Section -->
+        <div class="section-divider">
+            <h2><span>Staging</span> Opportunities</h2>
+        </div>
+
+        <div class="table-card" style="margin-bottom: 12px">
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px">
+                <h3 style="margin:0">Price Reduced — Still Active</h3>
+                <select id="opptyMinDom" onchange="loadOpportunities()" style="padding:4px 8px; border-radius:4px; border:1px solid #334155; background:#1e293b; color:#e2e8f0; font-size:13px">
+                    <option value="14">14+ DOM</option>
+                    <option value="30" selected>30+ DOM</option>
+                    <option value="45">45+ DOM</option>
+                    <option value="60">60+ DOM</option>
+                    <option value="90">90+ DOM</option>
+                </select>
+                <select id="opptyPriceRange" onchange="loadOpportunities()" style="padding:4px 8px; border-radius:4px; border:1px solid #334155; background:#1e293b; color:#e2e8f0; font-size:13px">
+                    <option value="0-99999999">All Prices</option>
+                    <option value="500000-749999">$500K–$750K</option>
+                    <option value="750000-999999">$750K–$1M</option>
+                    <option value="1000000-1499999">$1M–$1.5M</option>
+                    <option value="1500000-1999999">$1.5M–$2M</option>
+                    <option value="2000000-2999999">$2M–$3M</option>
+                    <option value="3000000-99999999">$3M+</option>
+                </select>
+                <select id="opptyMinPct" onchange="loadOpportunities()" style="padding:4px 8px; border-radius:4px; border:1px solid #334155; background:#1e293b; color:#e2e8f0; font-size:13px">
+                    <option value="0">Any Reduction</option>
+                    <option value="3">3%+ Reduced</option>
+                    <option value="5">5%+ Reduced</option>
+                    <option value="10">10%+ Reduced</option>
+                </select>
+                <span id="opptyCount" style="color:#94a3b8; font-size:13px"></span>
+            </div>
+            <div id="opptyContainer">
+                <div class="loading"><div class="spinner"></div>Loading opportunities...</div>
+            </div>
+        </div>
+
     </div>
     </div><!-- /app-wrapper -->
 
@@ -3909,6 +3947,90 @@
             loadCoverage();
             loadData();
             loadTopAgents();
+            loadOpportunities();
+        }
+
+        // =====================================================================
+        // Staging Opportunities — Price Reduced, Still Active
+        // =====================================================================
+        let opptyData = [];
+        let opptyPage = 0;
+        const opptyPageSize = 25;
+
+        async function loadOpportunities(page) {
+            opptyPage = page || 0;
+            const minDom = parseInt(document.getElementById('opptyMinDom').value);
+            const minPct = parseFloat(document.getElementById('opptyMinPct').value);
+            const [priceMin, priceMax] = document.getElementById('opptyPriceRange').value.split('-').map(Number);
+            const container = document.getElementById('opptyContainer');
+            if (opptyPage === 0) container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+
+            try {
+                const { data, error } = await sb.rpc('get_price_reduced_opportunities', {
+                    p_min_dom: minDom,
+                    p_min_reduction_pct: minPct,
+                    p_price_min: priceMin,
+                    p_price_max: priceMax,
+                    p_limit: opptyPageSize,
+                    p_offset: opptyPage * opptyPageSize
+                });
+                if (error) throw error;
+                opptyData = data;
+                renderOpportunities(data);
+            } catch (e) {
+                container.innerHTML = '<div style="color:#ef4444; padding:12px">Error loading opportunities: ' + e.message + '</div>';
+            }
+        }
+
+        function renderOpportunities(data) {
+            const container = document.getElementById('opptyContainer');
+            const countEl = document.getElementById('opptyCount');
+            if (!data || !data.length) {
+                container.innerHTML = '<div style="color:#94a3b8; padding:12px">No matching listings found.</div>';
+                countEl.textContent = '0 results';
+                return;
+            }
+            const total = data[0].total_count;
+            const start = opptyPage * opptyPageSize;
+            const end = Math.min(start + data.length, total);
+            countEl.textContent = total.toLocaleString() + ' listings';
+
+            const rows = data.map(d => {
+                const daysAgo = d.days_since_activity;
+                const freshClass = daysAgo <= 3 ? 'color:#22c55e;font-weight:600' : daysAgo <= 7 ? 'color:#eab308' : daysAgo <= 14 ? 'color:#f97316' : 'color:#94a3b8';
+                const pctClass = d.reduction_pct >= 10 ? 'color:#ef4444;font-weight:600' : d.reduction_pct >= 5 ? 'color:#f97316' : 'color:#eab308';
+                return `<tr style="cursor:pointer" onclick="document.getElementById('propertySearch').value='${(d.address || '').replace(/'/g, "\\'")}';searchProperty()">
+                    <td style="white-space:nowrap">${d.address || ''}</td>
+                    <td>${d.city || ''}</td>
+                    <td style="text-align:right">$${Number(d.current_price).toLocaleString()}</td>
+                    <td style="text-align:right;${pctClass}">-${d.reduction_pct}%</td>
+                    <td style="text-align:right">$${Number(d.reduction_amount).toLocaleString()}</td>
+                    <td style="text-align:center">${d.dom}</td>
+                    <td style="${freshClass};white-space:nowrap">${daysAgo === 0 ? 'Today' : daysAgo === 1 ? '1d ago' : daysAgo + 'd ago'}</td>
+                    <td style="white-space:nowrap">${d.list_agent_name || ''}</td>
+                    <td>${d.list_office_name || ''}</td>
+                    <td style="text-align:right">${d.sqft ? Number(d.sqft).toLocaleString() : '—'}</td>
+                    <td style="text-align:center">${d.beds || '—'}/${d.baths || '—'}</td>
+                </tr>`;
+            }).join('');
+
+            container.innerHTML = `
+                <div style="overflow-x:auto">
+                <table>
+                    <thead><tr>
+                        <th>Address</th><th>City</th><th style="text-align:right">Price</th>
+                        <th style="text-align:right">Reduced</th><th style="text-align:right">Amount</th>
+                        <th style="text-align:center">DOM</th><th>Last Activity</th>
+                        <th>Agent</th><th>Office</th><th style="text-align:right">SqFt</th><th style="text-align:center">Bd/Ba</th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+                </div>
+                <div class="pagination">
+                    <button class="btn btn-outline" onclick="loadOpportunities(${opptyPage - 1})" ${opptyPage === 0 ? 'disabled' : ''}>Prev</button>
+                    <span>Showing ${start + 1}–${end} of ${total.toLocaleString()}</span>
+                    <button class="btn btn-outline" onclick="loadOpportunities(${opptyPage + 1})" ${end >= total ? 'disabled' : ''}>Next</button>
+                </div>`;
         }
 
         // Check for existing session on load
