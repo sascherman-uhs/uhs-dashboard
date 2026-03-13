@@ -1362,6 +1362,7 @@
         let cmaSubjectProperty = null; // {beds, baths, sqft, year_built, current_price, subdivision, zip_code}
         let compData = [];
         let compPage = 0;
+        let compExcluded = new Set(); // MLS numbers excluded from CMA calculations
         const compPageSize = 25;
 
         // Determine which price range a price falls into
@@ -3276,6 +3277,7 @@
         // =====================================================================
         async function loadComps() {
             if (!cmaParcelId) return;
+            compExcluded.clear();
 
             const compType = cmaTab === 'sales' ? 'sold' : 'active';
             const tightness = document.getElementById('compTightness').value;
@@ -3398,6 +3400,18 @@
                 compCount,
                 adjustments
             };
+        }
+
+        function toggleComp(mlsNumber) {
+            if (compExcluded.has(mlsNumber)) compExcluded.delete(mlsNumber);
+            else compExcluded.add(mlsNumber);
+            const row = document.querySelector(`tr[data-mls="${mlsNumber}"]`);
+            if (row) row.style.opacity = compExcluded.has(mlsNumber) ? '0.35' : '1';
+            const cb = document.getElementById('comp-cb-' + mlsNumber);
+            if (cb) cb.checked = !compExcluded.has(mlsNumber);
+            const compType = cmaTab === 'sales' ? 'sold' : 'active';
+            const included = compData.filter(r => !compExcluded.has(r.mls_number));
+            renderCompSummary(included, included.length, compType);
         }
 
         // =====================================================================
@@ -3530,7 +3544,10 @@
                 const neighStyle = sameNeighborhood ? 'color:var(--green);font-weight:600' : 'color:var(--gray-600);font-size:11px';
                 const neighHtml = compSub ? `<span style="${neighStyle}">${compSub}</span>` : '<span style="color:var(--gray-400)">—</span>';
 
-                return `<tr>
+                const mlsNum = r.mls_number || '';
+                const isExcluded = compExcluded.has(mlsNum);
+                return `<tr data-mls="${mlsNum}" style="opacity:${isExcluded ? '0.35' : '1'}">
+                    <td style="text-align:center"><input type="checkbox" id="comp-cb-${mlsNum}" ${isExcluded ? '' : 'checked'} onchange="toggleComp('${mlsNum}')" style="cursor:pointer;width:16px;height:16px;accent-color:var(--gold)"></td>
                     <td style="text-align:left"><span class="match-badge ${matchCls}">${matchLabel}</span></td>
                     <td style="text-align:left">${addrHtml}</td>
                     <td style="text-align:left;white-space:nowrap">${neighHtml}</td>
@@ -3565,6 +3582,7 @@
             <table>
                 <thead>
                     <tr>
+                        <th style="text-align:center;width:30px">Use</th>
                         <th style="text-align:left">Match</th>
                         <th style="text-align:left">Address</th>
                         <th style="text-align:left">Neighborhood</th>
@@ -3956,14 +3974,17 @@
         let opptyData = [];
         let opptyPage = 0;
         const opptyPageSize = 25;
+        let opptySortCol = 'days_since_activity';
+        let opptySortDir = 'asc';
 
         async function loadOpportunities(page) {
-            opptyPage = page || 0;
+            if (page !== undefined) { opptyPage = page; renderOpportunities(); return; }
+            opptyPage = 0;
             const minDom = parseInt(document.getElementById('opptyMinDom').value);
             const minPct = parseFloat(document.getElementById('opptyMinPct').value);
             const [priceMin, priceMax] = document.getElementById('opptyPriceRange').value.split('-').map(Number);
             const container = document.getElementById('opptyContainer');
-            if (opptyPage === 0) container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+            container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
 
             try {
                 const { data, error } = await sb.rpc('get_price_reduced_opportunities', {
@@ -3971,31 +3992,59 @@
                     p_min_reduction_pct: minPct,
                     p_price_min: priceMin,
                     p_price_max: priceMax,
-                    p_limit: opptyPageSize,
-                    p_offset: opptyPage * opptyPageSize
+                    p_limit: 5000,
+                    p_offset: 0
                 });
                 if (error) throw error;
-                opptyData = data;
-                renderOpportunities(data);
+                opptyData = data || [];
+                sortOpptyData();
+                renderOpportunities();
             } catch (e) {
                 container.innerHTML = '<div style="color:#ef4444; padding:12px">Error loading opportunities: ' + e.message + '</div>';
             }
         }
 
-        function renderOpportunities(data) {
+        function sortOpptyData() {
+            const col = opptySortCol;
+            const dir = opptySortDir === 'asc' ? 1 : -1;
+            const numeric = ['current_price','reduction_pct','reduction_amount','dom','days_since_activity','sqft','beds','baths'].includes(col);
+            opptyData.sort((a, b) => {
+                let va = a[col], vb = b[col];
+                if (va == null) return 1; if (vb == null) return -1;
+                if (numeric) return (Number(va) - Number(vb)) * dir;
+                return String(va).localeCompare(String(vb)) * dir;
+            });
+        }
+
+        function sortOpportunities(col) {
+            if (opptySortCol === col) { opptySortDir = opptySortDir === 'asc' ? 'desc' : 'asc'; }
+            else { opptySortCol = col; opptySortDir = col === 'days_since_activity' ? 'asc' : 'desc'; }
+            opptyPage = 0;
+            sortOpptyData();
+            renderOpportunities();
+        }
+
+        function renderOpportunities() {
             const container = document.getElementById('opptyContainer');
             const countEl = document.getElementById('opptyCount');
-            if (!data || !data.length) {
+            if (!opptyData || !opptyData.length) {
                 container.innerHTML = '<div style="color:#94a3b8; padding:12px">No matching listings found.</div>';
                 countEl.textContent = '0 results';
                 return;
             }
-            const total = data[0].total_count;
+            const total = opptyData.length;
             const start = opptyPage * opptyPageSize;
-            const end = Math.min(start + data.length, total);
+            const end = Math.min(start + opptyPageSize, total);
+            const pageData = opptyData.slice(start, end);
             countEl.textContent = total.toLocaleString() + ' listings';
 
-            const rows = data.map(d => {
+            function sHdr(label, col, align) {
+                const arrow = opptySortCol === col ? (opptySortDir === 'asc' ? ' ▲' : ' ▼') : '';
+                const style = align ? `text-align:${align};` : '';
+                return `<th style="${style}cursor:pointer;user-select:none" onclick="sortOpportunities('${col}')">${label}${arrow}</th>`;
+            }
+
+            const rows = pageData.map(d => {
                 const daysAgo = d.days_since_activity;
                 const freshClass = daysAgo <= 3 ? 'color:#22c55e;font-weight:600' : daysAgo <= 7 ? 'color:#eab308' : daysAgo <= 14 ? 'color:#f97316' : 'color:#94a3b8';
                 const pctClass = d.reduction_pct >= 10 ? 'color:#ef4444;font-weight:600' : d.reduction_pct >= 5 ? 'color:#f97316' : 'color:#eab308';
@@ -4018,10 +4067,10 @@
                 <div style="overflow-x:auto">
                 <table>
                     <thead><tr>
-                        <th>Address</th><th>City</th><th style="text-align:right">Price</th>
-                        <th style="text-align:right">Reduced</th><th style="text-align:right">Amount</th>
-                        <th style="text-align:center">DOM</th><th>Last Activity</th>
-                        <th>Agent</th><th>Office</th><th style="text-align:right">SqFt</th><th style="text-align:center">Bd/Ba</th>
+                        ${sHdr('Address','address','')}${sHdr('City','city','')}${sHdr('Price','current_price','right')}
+                        ${sHdr('Reduced','reduction_pct','right')}${sHdr('Amount','reduction_amount','right')}
+                        ${sHdr('DOM','dom','center')}${sHdr('Last Activity','days_since_activity','')}
+                        ${sHdr('Agent','list_agent_name','')}${sHdr('Office','list_office_name','')}${sHdr('SqFt','sqft','right')}${sHdr('Bd/Ba','beds','center')}
                     </tr></thead>
                     <tbody>${rows}</tbody>
                 </table>
