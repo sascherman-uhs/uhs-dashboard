@@ -1287,6 +1287,20 @@
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhnbm1hd3lxZnJoYXZ1emtzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxOTcxMzMsImV4cCI6MjA4NTc3MzEzM30.fpnSrqNqMLNPvuFId9lv_VbC-38kYi0igVYHU9fYzkM';
 
         const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // Helper: RPC call with configurable timeout (default 45s) and retry
+        async function rpcWithTimeout(fnName, params, timeoutMs = 45000) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                const { data, error } = await sb.rpc(fnName, params).abortSignal(controller.signal);
+                clearTimeout(timer);
+                if (error) throw error;
+                return data;
+            } catch (err) {
+                clearTimeout(timer);
+                throw err;
+            }
+        }
 
         // Chart instances (for cleanup on reload)
         let activeChart = null;
@@ -2211,20 +2225,25 @@
         // =====================================================================
         // Agent: Top Agents
         // =====================================================================
-        async function loadTopAgents(page) {
+        async function loadTopAgents(page, retries = 2) {
             if (page !== undefined) agentPage = page;
             const offset = agentPage * agentPageSize;
             try {
-                const { data, error } = await sb.rpc('get_top_agents', {
+                const data = await rpcWithTimeout('get_top_agents', {
                     p_limit: agentPageSize,
                     p_offset: offset
-                });
-                if (error) throw error;
+                }, 30000);
                 if (data && data.length > 0) {
                     agentTotalCount = Number(data[0].total_agents);
                 }
                 renderTopAgents(data, offset);
             } catch (err) {
+                if (retries > 0) {
+                    document.getElementById('topAgentsContainer').innerHTML =
+                        '<div style="padding:16px;color:var(--gray-600)">Loading top agents (retry)...</div>';
+                    await new Promise(r => setTimeout(r, 2000));
+                    return loadTopAgents(undefined, retries - 1);
+                }
                 document.getElementById('topAgentsContainer').innerHTML =
                     '<div class="error-msg">Failed to load top agents: ' + err.message + '</div>';
             }
@@ -2296,20 +2315,24 @@
         // =====================================================================
         // Agent: Top Agents by Recent Sales
         // =====================================================================
-        async function loadTopAgentsBySales(page) {
+        async function loadTopAgentsBySales(page, retries = 2) {
             if (page !== undefined) topAgentSalesPage = page;
             const offset = topAgentSalesPage * agentPageSize;
             const container = document.getElementById('topAgentsContainer');
             container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading agents...</div>';
             try {
-                const { data, error } = await sb.rpc('get_top_agents_by_sales', {
+                const data = await rpcWithTimeout('get_top_agents_by_sales', {
                     p_limit: agentPageSize,
                     p_offset: offset
-                });
-                if (error) throw error;
+                }, 30000);
                 if (data && data.length > 0) topAgentSalesTotalCount = Number(data[0].total_agents);
                 renderTopAgentsBySales(data, offset);
             } catch (err) {
+                if (retries > 0) {
+                    container.innerHTML = '<div style="padding:16px;color:var(--gray-600)">Loading agents (retry)...</div>';
+                    await new Promise(r => setTimeout(r, 2000));
+                    return loadTopAgentsBySales(undefined, retries - 1);
+                }
                 container.innerHTML = '<div class="error-msg">Failed to load: ' + err.message + '</div>';
             }
         }
@@ -2368,7 +2391,7 @@
         let topAgentPricePage = 0;
         let topAgentPriceTotalCount = 0;
 
-        async function loadTopAgentsByPrice(rangeLabel, page) {
+        async function loadTopAgentsByPrice(rangeLabel, page, retries = 2) {
             if (rangeLabel !== undefined) topAgentPriceRange = rangeLabel;
             if (page !== undefined) topAgentPricePage = page;
             else topAgentPricePage = 0;
@@ -2377,17 +2400,21 @@
             const container = document.getElementById('topAgentsContainer');
             container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading agents...</div>';
             try {
-                const { data, error } = await sb.rpc('get_top_agents_by_price_range', {
+                const data = await rpcWithTimeout('get_top_agents_by_price_range', {
                     p_min_price: bounds[0],
                     p_max_price: bounds[1],
                     p_limit: agentPageSize,
                     p_offset: offset
-                });
-                if (error) throw error;
+                }, 30000);
                 if (data && data.length > 0) topAgentPriceTotalCount = Number(data[0].total_agents);
                 else topAgentPriceTotalCount = 0;
                 renderTopAgentsByPrice(data, topAgentPriceRange, offset);
             } catch (err) {
+                if (retries > 0) {
+                    container.innerHTML = '<div style="padding:16px;color:var(--gray-600)">Loading agents (retry)...</div>';
+                    await new Promise(r => setTimeout(r, 2000));
+                    return loadTopAgentsByPrice(undefined, undefined, retries - 1);
+                }
                 container.innerHTML = '<div class="error-msg">Failed to load: ' + err.message + '</div>';
             }
         }
@@ -3964,8 +3991,8 @@
             initDates();
             loadCoverage();
             loadData();
-            loadTopAgents();
-            loadOpportunities();
+            // Delay agent queries to avoid competing with initial data load
+            setTimeout(() => { loadTopAgents(); loadOpportunities(); }, 1500);
         }
 
         // =====================================================================
@@ -3977,7 +4004,7 @@
         let opptySortCol = 'days_since_activity';
         let opptySortDir = 'asc';
 
-        async function loadOpportunities(page) {
+        async function loadOpportunities(page, retries = 2) {
             if (page !== undefined) { opptyPage = page; renderOpportunities(); return; }
             opptyPage = 0;
             const minDom = parseInt(document.getElementById('opptyMinDom').value);
@@ -3987,19 +4014,23 @@
             container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
 
             try {
-                const { data, error } = await sb.rpc('get_price_reduced_opportunities', {
+                const data = await rpcWithTimeout('get_price_reduced_opportunities', {
                     p_min_dom: minDom,
                     p_min_reduction_pct: minPct,
                     p_price_min: priceMin,
                     p_price_max: priceMax,
                     p_limit: 5000,
                     p_offset: 0
-                });
-                if (error) throw error;
+                }, 30000);
                 opptyData = data || [];
                 sortOpptyData();
                 renderOpportunities();
             } catch (e) {
+                if (retries > 0) {
+                    container.innerHTML = '<div style="padding:16px;color:var(--gray-600)">Loading opportunities (retry)...</div>';
+                    await new Promise(r => setTimeout(r, 2000));
+                    return loadOpportunities(undefined, retries - 1);
+                }
                 container.innerHTML = '<div style="color:#ef4444; padding:12px">Error loading opportunities: ' + e.message + '</div>';
             }
         }
