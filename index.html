@@ -473,6 +473,8 @@
             letter-spacing: 0.5px;
         }
         .match-badge.sub { background: #dcfce7; color: #166534; }
+        .match-badge.community { background: #d1fae5; color: #065f46; }
+        .match-badge.prox { background: #fef3c7; color: #92400e; }
         .match-badge.zip { background: #dbeafe; color: #1e40af; }
 
         /* Comp KPI cards */
@@ -1221,7 +1223,8 @@
             <div class="comp-filter-bar" id="compFilterBar">
                 <label>Match:</label>
                 <select id="compTightness" onchange="loadComps()">
-                    <option value="tight">Same Subdivision (Appraiser)</option>
+                    <option value="tight">Community (Fuzzy Subdivision)</option>
+                    <option value="proximity">Nearby (0.5 mi radius)</option>
                     <option value="medium">Same Zip (Similar Size)</option>
                     <option value="wide">Same Zip (All)</option>
                 </select>
@@ -2744,14 +2747,17 @@
 
         function fmtClosedOrCOE(l) {
             if (l.close_date) return fmtDate(l.close_date);
-            const ucStatuses = ['UCS', 'US', 'UCNS', 'UNS', 'COS', 'P'];
-            if (ucStatuses.includes((l.status || '').toUpperCase()) && l.acceptance_date) {
-                const accepted = new Date(l.acceptance_date + 'T00:00:00');
-                const estCOE = new Date(accepted);
-                estCOE.setDate(estCOE.getDate() + 30);
-                const estStr = estCOE.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
-                const accStr = fmtDate(l.acceptance_date);
-                return `<span style="color:#b8860b;font-weight:600">Est. ${estStr}</span><br><span style="font-size:0.75em;color:#888">Accepted ${accStr}</span>`;
+            const ucStatuses = ['UCS', 'US', 'UCNS', 'UNS', 'COS', 'P', 'CSL'];
+            if (ucStatuses.includes((l.status || '').toUpperCase())) {
+                if (l.est_close_date) {
+                    const estStr = fmtDate(l.est_close_date);
+                    const accStr = l.acceptance_date ? fmtDate(l.acceptance_date) : '';
+                    return `<span style="color:#b8860b;font-weight:600">Est. COE ${estStr}</span>` +
+                        (accStr ? `<br><span style="font-size:0.75em;color:#888">Accepted ${accStr}</span>` : '');
+                }
+                if (l.acceptance_date) {
+                    return `<span style="font-size:0.85em;color:#888">Accepted ${fmtDate(l.acceptance_date)}</span>`;
+                }
             }
             return '—';
         }
@@ -2806,7 +2812,7 @@
                     <td>${fmtN(l.sqft)}</td>
                     <td>${l.dom != null ? l.dom : '—'}</td>
                     <td>${fmtDate(l.list_date)}</td>
-                    <td>${fmtDate(l.close_date)}</td>
+                    <td>${fmtClosedOrCOE(l)}</td>
                 </tr>`;
             }).join('');
 
@@ -2826,7 +2832,7 @@
                         <th>SqFt</th>
                         <th>DOM</th>
                         <th>Listed</th>
-                        <th>Closed</th>
+                        <th>Closed/COE</th>
                     </tr>
                 </thead>
                 <tbody>${rows}</tbody>
@@ -2882,7 +2888,7 @@
                     <td>${fmtN(d.sqft)}</td>
                     <td>${d.dom != null ? d.dom : '\u2014'}</td>
                     <td>${fmtDate(d.list_date)}</td>
-                    <td>${fmtDate(d.close_date)}</td>
+                    <td>${fmtClosedOrCOE(d)}</td>
                     <td style="text-align:left; font-size:0.85em">${d.list_agent_name || '\u2014'}</td>
                 </tr>`;
             }).join('');
@@ -3021,6 +3027,11 @@
                     priceLabel = 'List Price';
                     priceVal = fmtPrice(latest.current_price);
                     if (latest.acceptance_date) detailParts.push('Accepted ' + fmtDate(latest.acceptance_date));
+                    if (latest.est_close_date) {
+                        detailParts.push('Est. COE ' + fmtDate(latest.est_close_date));
+                    } else if (latest.close_date) {
+                        detailParts.push('COE ' + fmtDate(latest.close_date));
+                    }
                     if (latest.list_date) detailParts.push('Listed ' + fmtDate(latest.list_date));
                     if (latest.dom != null) detailParts.push(latest.dom + ' DOM');
                 } else if (st === 'S' || st === 'H') {
@@ -3314,14 +3325,38 @@
             document.getElementById('compCount').textContent = '';
 
             try {
-                const { data, error } = await sb.rpc('get_property_comps', {
-                    p_parcel_id: cmaParcelId,
-                    p_comp_type: compType,
-                    p_tightness: tightness,
-                    p_limit: compPageSize,
-                    p_offset: compPage * compPageSize
-                });
-                if (error) throw error;
+                let data, error;
+
+                if (tightness === 'proximity') {
+                    // Proximity search uses separate RPC with lat/long
+                    ({ data, error } = await sb.rpc('get_property_comps_proximity', {
+                        p_parcel_id: cmaParcelId,
+                        p_comp_type: compType,
+                        p_radius_miles: 0.5,
+                        p_limit: compPageSize,
+                        p_offset: compPage * compPageSize
+                    }));
+                    if (error) throw error;
+                    if (!data || data.length === 0) {
+                        container.innerHTML = '<div class="error-msg" style="text-align:center;padding:40px">'
+                            + '<div style="font-size:18px;margin-bottom:8px">Geocoding In Progress</div>'
+                            + '<div style="color:var(--gray-400)">This property hasn\'t been geocoded yet. '
+                            + 'The nightly geocoding process will add coordinates to enable proximity search. '
+                            + 'Try <b>Community</b> or <b>Same Zip</b> matching in the meantime.</div></div>';
+                        document.getElementById('compSummary').innerHTML = '';
+                        document.getElementById('compCount').textContent = '0 comps found';
+                        return;
+                    }
+                } else {
+                    ({ data, error } = await sb.rpc('get_property_comps', {
+                        p_parcel_id: cmaParcelId,
+                        p_comp_type: compType,
+                        p_tightness: tightness,
+                        p_limit: compPageSize,
+                        p_offset: compPage * compPageSize
+                    }));
+                    if (error) throw error;
+                }
 
                 compData = data || [];
                 const totalCount = compData.length > 0 ? Number(compData[0].total_count) : 0;
@@ -3542,8 +3577,10 @@
             const rows = data.map(r => {
                 const price = isSold ? fmtPrice(r.sold_price || r.current_price) : fmtPrice(r.current_price);
                 const ppsf = r.price_per_sqft ? '$' + Math.round(Number(r.price_per_sqft)) : '—';
-                const matchCls = r.match_quality === 'subdivision' ? 'sub' : 'zip';
-                const matchLabel = r.match_quality === 'subdivision' ? 'SUB' : 'ZIP';
+                const matchMap = {'exact subdivision':'sub','community':'community','proximity':'prox','zip':'zip'};
+                const labelMap = {'exact subdivision':'EXACT','community':'COMM','proximity':'PROX','zip':'ZIP'};
+                const matchCls = matchMap[r.match_quality] || 'zip';
+                const matchLabel = labelMap[r.match_quality] || 'ZIP';
                 const dateCol = isSold ? fmtDate(r.close_date) : fmtDate(r.list_date);
                 const stl = isSold && r.sold_to_list_pct ? r.sold_to_list_pct + '%' : '—';
 
