@@ -1504,15 +1504,22 @@
         // =====================================================================
         async function loadData() {
             try {
-                // First, fetch freshness to cap dates before querying
-                const freshnessRes = await sb.from('listings')
-                    .select('updated_at')
-                    .order('updated_at', { ascending: false })
-                    .limit(1);
-
-                // Cap date pickers to last import date
-                if (freshnessRes.data && freshnessRes.data.length > 0) {
-                    const lastUpdate = new Date(freshnessRes.data[0].updated_at);
+                // Fetch freshness via get_import_coverage RPC. Using the RPC instead
+                // of a direct SELECT on `listings` avoids "permission denied" when the
+                // anon key lacks table-level SELECT grants — matches what the per-section
+                // import cards already use, so the header and cards can't disagree.
+                const coverageRes = await sb.rpc('get_import_coverage');
+                let lastUpdate = null;
+                if (coverageRes.data && coverageRes.data.length > 0) {
+                    // Most recent import across all status groups
+                    const maxIso = coverageRes.data
+                        .map(r => r.last_import_date)
+                        .filter(Boolean)
+                        .sort()
+                        .pop();
+                    if (maxIso) lastUpdate = new Date(maxIso);
+                }
+                if (lastUpdate) {
                     applyFreshness(lastUpdate);
                 } else {
                     document.getElementById('headerFreshness').innerHTML =
@@ -3196,40 +3203,33 @@
                     const accuracy = Math.round(pos.coords.accuracy);
                     status.textContent = `Found: ${latitude.toFixed(5)}, ${longitude.toFixed(5)} (±${accuracy}m) — searching nearby...`;
                     try {
-                        // Get street name from Nominatim for a database search term
-                        const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`, {
-                            headers: { 'Accept-Language': 'en' }
+                        // Spatial search: 1.5 mi radius + up to 100 results, to tolerate indoor GPS drift.
+                        const { data: results, error } = await sb.rpc('find_nearby_properties', {
+                            p_lat: latitude,
+                            p_lon: longitude,
+                            p_radius_m: 2414,
+                            p_limit: 100
                         });
-                        const data = await resp.json();
-                        const addr = data.address;
-                        const road = addr.road || '';
-                        if (!road) {
-                            status.textContent = 'No street found at this location. Try typing the address.';
-                            btn.classList.remove('loading');
-                            return;
-                        }
-
-                        // Search our database for properties on this street
-                        const { data: results, error } = await sb.rpc('search_property', { p_address: road });
                         btn.classList.remove('loading');
                         if (error) throw error;
                         if (!results || results.length === 0) {
-                            status.textContent = `No properties found on "${road}". Try typing the address.`;
+                            status.textContent = 'No properties found within 1.5 miles. Try typing the address.';
                             return;
                         }
 
-                        // Group by parcel_id and sort by address proximity to GPS coords
+                        // Group by parcel_id (results come back sorted by distance ascending).
                         const parcels = {};
                         results.forEach(r => {
                             if (!parcels[r.parcel_id]) parcels[r.parcel_id] = [];
                             parcels[r.parcel_id].push(r);
                         });
 
-                        // Show top 8 as a picker with the nearest address highlighted
-                        const parcelIds = Object.keys(parcels).slice(0, 8);
-                        status.textContent = `${parcelIds.length} properties on ${road} — select yours:`;
+                        const parcelIds = Object.keys(parcels).slice(0, 30);
+                        const nearest = results[0];
+                        const distFt = Math.round(nearest.distance_m * 3.28084);
+                        status.textContent = `${parcelIds.length} properties nearby (showing top 30 of ${Object.keys(parcels).length}) — nearest: ${nearest.address} (${distFt} ft)`;
                         window.propSearchResults = parcels;
-                        showGpsPicker(parcels, parcelIds, road);
+                        showGpsPicker(parcels, parcelIds, `within 1.5 mi`);
                     } catch (err) {
                         status.textContent = 'Lookup failed: ' + err.message;
                         btn.classList.remove('loading');
@@ -3248,11 +3248,11 @@
             );
         }
 
-        function showGpsPicker(parcels, parcelIds, streetName) {
+        function showGpsPicker(parcels, parcelIds, locationLabel) {
             const panel = document.getElementById('propertyDetail');
             panel.className = 'agent-detail visible';
             document.getElementById('clearPropBtn').style.display = '';
-            document.getElementById('propertySearch').value = streetName;
+            document.getElementById('propertySearch').value = locationLabel;
 
             let items = '';
             for (const pid of parcelIds) {
@@ -3261,6 +3261,7 @@
                 const latest = rows.find(r => r.mls_number);
                 const statusLabel = latest ? statusBadge(latest.status) : '<span class="status-badge status-other">No Listings</span>';
                 const priceLabel = latest ? fmtPrice(latest.current_price) : '';
+                const distLabel = p.distance_m != null ? (p.distance_m < 300 ? `${Math.round(p.distance_m * 3.28084)} ft` : `${(p.distance_m / 1609.34).toFixed(2)} mi`) : '';
                 items += `
                     <div class="prop-result-item" onclick="showPropertyDetail(propSearchResults['${pid}'])">
                         <div>
@@ -3270,12 +3271,13 @@
                         <div style="text-align:right">
                             ${statusLabel}
                             <div class="meta">${priceLabel}</div>
+                            ${distLabel ? `<div class="meta" style="color:var(--accent)">${distLabel}</div>` : ''}
                         </div>
                     </div>`;
             }
 
             panel.innerHTML = `
-                <h3 style="margin-bottom:12px">Select Your Property on ${streetName}</h3>
+                <h3 style="margin-bottom:12px">Nearby Properties (${locationLabel})</h3>
                 <div class="prop-results">${items}</div>`;
 
             document.getElementById('cmaTabs').style.display = 'none';
@@ -4152,6 +4154,16 @@
 
         // Check for existing session on load
         (async function init() {
+            // [DEV AUTH BYPASS 2026-04-14] Local-only bypass: when served from
+            // localhost/127.0.0.1 with ?dev=1 in the URL, skip the login screen.
+            // Refuses to bypass on any other hostname so a deployed copy cannot
+            // be unlocked by appending the query param.
+            const params = new URLSearchParams(location.search);
+            const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+            if (params.get('dev') === '1' && isLocal) {
+                showApp();
+                return;
+            }
             const { data: { session } } = await sb.auth.getSession();
             if (session) {
                 showApp();
