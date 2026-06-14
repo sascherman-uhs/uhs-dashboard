@@ -1279,6 +1279,107 @@
             </div>
         </div>
 
+        <!-- Price Reduction Intelligence Section -->
+        <div class="section-divider">
+            <h2><span>Price Reduction</span> Intelligence</h2>
+        </div>
+
+        <!-- Card 1: Timing by Price Band -->
+        <div class="table-card" style="margin-bottom:12px">
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px">
+                <h3 style="margin:0">When Do Sellers Cut? — By Price Band</h3>
+                <span style="color:#94a3b8; font-size:12px; font-style:italic">Timing from the change log: true days-on-market at each listing's first price cut (logged since Mar 2026). Active/Reduced columns reflect current inventory. Grows more precise daily.</span>
+            </div>
+            <div id="priceReductionTimingContainer">
+                <div class="loading"><div class="spinner"></div>Loading timing data...</div>
+            </div>
+        </div>
+
+        <!-- Card 2: At-Risk Targets (not yet reduced, approaching danger zone) -->
+        <div class="table-card" style="margin-bottom:12px">
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px">
+                <h3 style="margin:0">At-Risk Targets — Full Price, Approaching Cut Zone</h3>
+                <select id="targetMinDom" onchange="loadPreCutTargets()" style="padding:4px 8px; border-radius:4px; border:1px solid #334155; background:#1e293b; color:#e2e8f0; font-size:13px">
+                    <option value="21">21+ DOM</option>
+                    <option value="30" selected>30+ DOM</option>
+                    <option value="45">45+ DOM</option>
+                    <option value="60">60+ DOM</option>
+                </select>
+                <select id="targetPriceRange" onchange="loadPreCutTargets()" style="padding:4px 8px; border-radius:4px; border:1px solid #334155; background:#1e293b; color:#e2e8f0; font-size:13px">
+                    <option value="0-99999999">All Prices</option>
+                    <option value="500000-749999">$500K–$750K</option>
+                    <option value="750000-999999">$750K–$1M</option>
+                    <option value="1000000-1499999">$1M–$1.5M</option>
+                    <option value="1500000-1999999">$1.5M–$2M</option>
+                    <option value="2000000-2999999">$2M–$3M</option>
+                    <option value="3000000-99999999">$3M+</option>
+                </select>
+                <span id="targetCount" style="color:#94a3b8; font-size:13px"></span>
+                <button onclick="exportPreCutTargets()" style="margin-left:auto; padding:5px 12px; background:#1e40af; color:#fff; border:none; border-radius:4px; font-size:12px; cursor:pointer">Export CSV</button>
+            </div>
+            <div id="preCutTargetsContainer">
+                <div class="loading"><div class="spinner"></div>Loading targets...</div>
+            </div>
+        </div>
+
+        <!-- Best Value vs. Local Comps Section -->
+        <div class="section-divider">
+            <h2><span>Best Value</span> vs. Local Comps</h2>
+        </div>
+
+        <div class="table-card" style="margin-bottom:12px">
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:10px">
+                <h3 style="margin:0">Underpriced vs. Nearby Sold Comps</h3>
+                <span style="color:#94a3b8; font-size:12px; font-style:italic">Active listings priced below the median $/sqft of SOLD homes within &frac12; mile (same type, similar size &amp; age, &ge;5 comps) &mdash; local proximity, not the broader market. Refreshed nightly.</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px">
+                <select id="bvCity" onchange="loadBestValue()" style="padding:4px 8px; border-radius:4px; border:1px solid #334155; background:#1e293b; color:#e2e8f0; font-size:13px">
+                    <option value="">All Cities</option>
+                    <option value="Las Vegas">Las Vegas</option>
+                    <option value="Henderson">Henderson</option>
+                    <option value="North Las Vegas">North Las Vegas</option>
+                    <option value="Boulder City">Boulder City</option>
+                    <option value="Pahrump">Pahrump</option>
+                    <option value="Laughlin">Laughlin</option>
+                    <option value="Mesquite">Mesquite</option>
+                    <option value="Indian Springs">Indian Springs</option>
+                </select>
+                <select id="bvPriceRange" onchange="loadBestValue()" style="padding:4px 8px; border-radius:4px; border:1px solid #334155; background:#1e293b; color:#e2e8f0; font-size:13px">
+                    <option value="0-99999999">All Prices</option>
+                    <option value="0-499999">&lt; $500K</option>
+                    <option value="500000-749999">$500K&ndash;$750K</option>
+                    <option value="750000-999999">$750K&ndash;$1M</option>
+                    <option value="1000000-1499999">$1M&ndash;$1.5M</option>
+                    <option value="1500000-1999999">$1.5M&ndash;$2M</option>
+                    <option value="2000000-2999999">$2M&ndash;$3M</option>
+                    <option value="3000000-99999999">$3M+</option>
+                </select>
+                <select id="bvMinDiscount" onchange="loadBestValue()" style="padding:4px 8px; border-radius:4px; border:1px solid #334155; background:#1e293b; color:#e2e8f0; font-size:13px">
+                    <option value="0">Any discount</option>
+                    <option value="5">5%+ under comps</option>
+                    <option value="10" selected>10%+ under comps</option>
+                    <option value="15">15%+ under comps</option>
+                    <option value="20">20%+ under comps</option>
+                    <option value="25">25%+ under comps</option>
+                </select>
+                <select id="bvSort" onchange="renderBestValue()" style="padding:4px 8px; border-radius:4px; border:1px solid #334155; background:#1e293b; color:#e2e8f0; font-size:13px">
+                    <option value="discount">Sort: Discount %</option>
+                    <option value="gap">Sort: $ Gap</option>
+                    <option value="dom">Sort: Days on Market</option>
+                    <option value="price">Sort: List Price &uarr;</option>
+                </select>
+                <label style="color:#94a3b8; font-size:12px; display:flex; align-items:center; gap:4px; cursor:pointer">
+                    <input type="checkbox" id="bvIncludeReview" onchange="loadBestValue()"> show flagged
+                </label>
+                <span id="bvCount" style="color:#94a3b8; font-size:13px"></span>
+                <button onclick="loadBestValue()" style="padding:5px 12px; background:#334155; color:#e2e8f0; border:none; border-radius:4px; font-size:12px; cursor:pointer">&#8635; Refresh</button>
+                <button onclick="exportBestValue()" style="margin-left:auto; padding:5px 12px; background:#1e40af; color:#fff; border:none; border-radius:4px; font-size:12px; cursor:pointer">Export CSV</button>
+            </div>
+            <div id="bestValueContainer">
+                <div class="loading"><div class="spinner"></div>Loading best-value listings...</div>
+            </div>
+        </div>
+
     </div>
     </div><!-- /app-wrapper -->
 
@@ -1530,7 +1631,7 @@
                 const startDate = document.getElementById('startDate').value;
                 const endDate = document.getElementById('endDate').value;
 
-                const [activeRes, salesRes, hiddenRes, activeTrendRes, salesTrendRes] = await Promise.all([
+                const [activeRes, salesRes, hiddenRes, activeTrendRes, salesTrendRes, atListRes] = await Promise.all([
                     sb.rpc('get_active_summary'),
                     sb.rpc('get_sales_summary', {
                         p_start_date: startDate,
@@ -1541,7 +1642,15 @@
                     sb.rpc('get_sales_trend', {
                         p_start_date: startDate,
                         p_end_date: endDate
-                    })
+                    }),
+                    sb.from('listings')
+                        .select('sold_price, original_list_price', { count: 'exact', head: false })
+                        .not('close_date', 'is', null)
+                        .not('sold_price', 'is', null)
+                        .not('original_list_price', 'is', null)
+                        .gte('close_date', startDate)
+                        .lte('close_date', endDate)
+                        .limit(10000)
                 ]);
 
                 if (activeRes.error) throw activeRes.error;
@@ -1552,6 +1661,18 @@
                 const hidden = hiddenRes.error ? [] : (hiddenRes.data || []);
                 const activeTrend = activeTrendRes.error ? [] : (activeTrendRes.data || []);
                 const salesTrend = salesTrendRes.error ? [] : (salesTrendRes.data || []);
+
+                // Compute sold-at-or-above-list from raw rows
+                let soldAtListPct = null, soldAtListCount = 0, soldAtListTotal = 0;
+                if (!atListRes.error && atListRes.data) {
+                    const rows = atListRes.data.filter(r =>
+                        Number(r.sold_price) > 0 && Number(r.original_list_price) > 0 &&
+                        Number(r.sold_price) / Number(r.original_list_price) < 3
+                    );
+                    soldAtListTotal = rows.length;
+                    soldAtListCount = rows.filter(r => Number(r.sold_price) >= Number(r.original_list_price)).length;
+                    if (soldAtListTotal > 0) soldAtListPct = ((soldAtListCount / soldAtListTotal) * 100).toFixed(1);
+                }
 
                 // Store sales data globally for agent market comparison
                 salesByRange = {};
@@ -1567,7 +1688,7 @@
                 document.getElementById('freshness').textContent =
                     'Sales window: ' + formatDateRange(startDate, endDate);
 
-                renderKPIs(active, sales, hidden);
+                renderKPIs(active, sales, hidden, soldAtListPct, soldAtListCount, soldAtListTotal);
                 renderCharts(active, sales);
                 renderTable(active, sales);
                 renderHiddenDom(hidden);
@@ -1590,7 +1711,7 @@
         // =====================================================================
         // KPI Cards
         // =====================================================================
-        function renderKPIs(active, sales, hidden) {
+        function renderKPIs(active, sales, hidden, soldAtListPct, soldAtListCount, soldAtListTotal) {
             const totalActive = active.reduce((s, r) => s + Number(r.listing_count), 0);
             const totalSold = sales.reduce((s, r) => s + Number(r.sold_count), 0);
             const totalUC = active.reduce((s, r) => s + Number(r.uc_count || 0), 0);
@@ -1609,12 +1730,15 @@
 
             const totalReductions = active.reduce((s, r) => s + Number(r.price_reduction_count), 0);
             const reductionPct = totalActive > 0 ? ((totalReductions / totalActive) * 100).toFixed(1) : 0;
+            const blendedReductionPct = weightedAvg(active, 'avg_reduction_pct', 'listing_count') || 0;
+            const avgReductionPctForReduced = totalReductions > 0 ? (blendedReductionPct * totalActive / totalReductions) : 0;
+            const avgReductionDollarsForReduced = avgActivePrice ? Math.round(avgReductionPctForReduced / 100 * avgActivePrice) : 0;
 
             document.getElementById('kpiGrid').innerHTML = `
                 <div class="kpi-card highlight">
                     <div class="kpi-label">Active Listings</div>
                     <div class="kpi-value">${fmtN(totalActive)}</div>
-                    <div class="kpi-sub">${fmtN(totalUC)} under contract &bull; ${reductionPct}% price reduced</div>
+                    <div class="kpi-sub">${fmtN(totalUC)} under contract</div>
                 </div>
                 <div class="kpi-card">
                     <div class="kpi-label">Avg Active Price</div>
@@ -1640,6 +1764,16 @@
                     <div class="kpi-label">Avg Discount</div>
                     <div class="kpi-value" style="${discountColor(avgSoldToList)}">${fmtDiscount(avgSoldToList)}</div>
                     <div class="kpi-sub">Off list price (S/L: ${fmtPct(avgSoldToList)})</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Price Reductions</div>
+                    <div class="kpi-value" style="color:${reductionPct >= 40 ? '#ef4444' : reductionPct >= 25 ? '#f97316' : '#22c55e'}">${reductionPct}%</div>
+                    <div class="kpi-sub">of active listings cut &bull; avg ${avgReductionPctForReduced.toFixed(1)}% (~${fmt$(avgReductionDollarsForReduced)}) off ask</div>
+                </div>
+                <div class="kpi-card${soldAtListPct !== null && Number(soldAtListPct) >= 35 ? ' highlight' : ''}">
+                    <div class="kpi-label">Sold at List or Higher</div>
+                    <div class="kpi-value" style="color:${soldAtListPct === null ? 'inherit' : Number(soldAtListPct) >= 40 ? 'var(--green)' : Number(soldAtListPct) >= 25 ? '#f97316' : '#ef4444'}">${soldAtListPct !== null ? soldAtListPct + '%' : '—'}</div>
+                    <div class="kpi-sub">${soldAtListTotal > 0 ? fmtN(soldAtListCount) + ' of ' + fmtN(soldAtListTotal) + ' closed sales' : 'No data in period'}</div>
                 </div>
             `;
         }
@@ -4032,6 +4166,7 @@
             loadData();
             // Delay agent queries to avoid competing with initial data load
             setTimeout(() => { loadTopAgents(); loadOpportunities(); }, 1500);
+            setTimeout(() => { loadPriceReductionTiming(); loadPreCutTargets(); loadBestValue(); }, 3000);
         }
 
         // =====================================================================
@@ -4150,6 +4285,301 @@
                     <span>Showing ${start + 1}–${end} of ${total.toLocaleString()}</span>
                     <button class="btn btn-outline" onclick="loadOpportunities(${opptyPage + 1})" ${end >= total ? 'disabled' : ''}>Next</button>
                 </div>`;
+        }
+
+        // =====================================================================
+        // Price Reduction Intelligence
+        // =====================================================================
+
+        // --- Card 1: Timing by Price Band ---
+        async function loadPriceReductionTiming() {
+            const container = document.getElementById('priceReductionTimingContainer');
+            try {
+                const data = await rpcWithTimeout('get_price_reduction_timing_proxy', {}, 30000);
+                if (!data || data.length === 0) {
+                    container.innerHTML = '<div style="color:#94a3b8;padding:12px">No data available.</div>';
+                    return;
+                }
+                const rows = data.map(r => {
+                    const pctClass = r.pct_reduced >= 40 ? 'color:#ef4444;font-weight:600'
+                                   : r.pct_reduced >= 25 ? 'color:#f97316'
+                                   : 'color:#eab308';
+                    const window = (r.intervention_window_start != null && r.intervention_window_end != null)
+                        ? `Day ${r.intervention_window_start}–${r.intervention_window_end}`
+                        : '—';
+                    const domRange = (r.p25_dom != null && r.p75_dom != null)
+                        ? `${r.p25_dom}–${r.p75_dom}`
+                        : (r.median_dom != null ? String(r.median_dom) : '—');
+                    return `<tr>
+                        <td style="font-weight:600">${r.price_band}</td>
+                        <td style="text-align:right">${Number(r.count_active).toLocaleString()}</td>
+                        <td style="text-align:right">${Number(r.count_reduced).toLocaleString()}</td>
+                        <td style="text-align:right;${pctClass}">${r.pct_reduced}%</td>
+                        <td style="text-align:center">${r.median_dom != null ? r.median_dom : '—'}</td>
+                        <td style="text-align:center;color:#94a3b8">${domRange}</td>
+                        <td style="text-align:right;color:#94a3b8">${r.median_reduction_pct != null ? '-' + r.median_reduction_pct + '%' : '—'}</td>
+                        <td style="text-align:right;color:#94a3b8">${r.median_reduction_amt != null ? '-$' + Number(r.median_reduction_amt).toLocaleString() : '—'}</td>
+                        <td style="text-align:center;color:#22c55e;font-weight:600">${window}</td>
+                    </tr>`;
+                }).join('');
+                container.innerHTML = `
+                    <div style="overflow-x:auto">
+                    <table>
+                        <thead><tr>
+                            <th>Price Band</th>
+                            <th style="text-align:right">Active</th>
+                            <th style="text-align:right">Reduced</th>
+                            <th style="text-align:right">% Cut</th>
+                            <th style="text-align:center">Median DOM</th>
+                            <th style="text-align:center">IQR (P25–P75)</th>
+                            <th style="text-align:right">Median Cut %</th>
+                            <th style="text-align:right">Median Cut $</th>
+                            <th style="text-align:center">Outreach Window</th>
+                        </tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                    </div>
+                    <p style="color:#64748b;font-size:11px;margin:8px 0 0">
+                        Outreach Window = 15 days before P25 (when the earliest 25% of price cuts occur). Stage before this window to pre-empt the reduction conversation.
+                    </p>`;
+            } catch (e) {
+                container.innerHTML = '<div style="color:#ef4444;padding:12px">Error: ' + e.message + '</div>';
+            }
+        }
+
+        // --- Card 2: At-Risk Targets ---
+        let preCutData = [];
+        let preCutPage = 0;
+        const preCutPageSize = 25;
+
+        async function loadPreCutTargets(page) {
+            if (page !== undefined) { preCutPage = page; renderPreCutTargets(); return; }
+            preCutPage = 0;
+            const container = document.getElementById('preCutTargetsContainer');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading targets...</div>';
+            const minDom = parseInt(document.getElementById('targetMinDom').value);
+            const [priceMin, priceMax] = document.getElementById('targetPriceRange').value.split('-').map(Number);
+            try {
+                const data = await rpcWithTimeout('get_precut_targets', {
+                    p_price_min: priceMin,
+                    p_price_max: priceMax,
+                    p_min_dom: minDom,
+                    p_limit: 500
+                }, 30000);
+                preCutData = data || [];
+                document.getElementById('targetCount').textContent = preCutData.length.toLocaleString() + ' listings';
+                renderPreCutTargets();
+            } catch (e) {
+                container.innerHTML = '<div style="color:#ef4444;padding:12px">Error: ' + e.message + '</div>';
+            }
+        }
+
+        function renderPreCutTargets() {
+            const container = document.getElementById('preCutTargetsContainer');
+            if (preCutData.length === 0) {
+                container.innerHTML = '<div style="color:#94a3b8;padding:12px">No listings match these filters.</div>';
+                return;
+            }
+            const total = preCutData.length;
+            const start = preCutPage * preCutPageSize;
+            const end = Math.min(start + preCutPageSize, total);
+            const pageData = preCutData.slice(start, end);
+            const rows = pageData.map(d => {
+                const domClass = d.dom >= 60 ? 'color:#ef4444;font-weight:600'
+                               : d.dom >= 45 ? 'color:#f97316'
+                               : d.dom >= 30 ? 'color:#eab308'
+                               : 'color:#94a3b8';
+                return `<tr onclick="searchProperty('${(d.address||'').replace(/'/g,"\\'")}')">
+                    <td>${d.address || ''}</td>
+                    <td>${d.city || ''}</td>
+                    <td style="text-align:right">$${Number(d.current_price).toLocaleString()}</td>
+                    <td style="font-size:11px;color:#94a3b8">${d.price_band || ''}</td>
+                    <td style="text-align:center;${domClass}">${d.dom}</td>
+                    <td>${d.list_date || ''}</td>
+                    <td>${d.list_agent_name || ''}</td>
+                    <td>${d.list_agent_phone || ''}</td>
+                    <td>${d.list_office_name || ''}</td>
+                    <td style="text-align:center">${d.beds || '—'}/${d.baths || '—'}</td>
+                    <td style="text-align:right">${d.sqft ? Number(d.sqft).toLocaleString() : '—'}</td>
+                </tr>`;
+            }).join('');
+            container.innerHTML = `
+                <div style="overflow-x:auto">
+                <table>
+                    <thead><tr>
+                        <th>Address</th><th>City</th>
+                        <th style="text-align:right">List Price</th>
+                        <th>Band</th>
+                        <th style="text-align:center">DOM</th>
+                        <th>Listed</th>
+                        <th>Agent</th><th>Phone</th><th>Office</th>
+                        <th style="text-align:center">Bd/Ba</th>
+                        <th style="text-align:right">SqFt</th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+                </div>
+                <div class="pagination">
+                    <button class="btn btn-outline" onclick="loadPreCutTargets(${preCutPage - 1})" ${preCutPage === 0 ? 'disabled' : ''}>Prev</button>
+                    <span>Showing ${start + 1}–${end} of ${total.toLocaleString()}</span>
+                    <button class="btn btn-outline" onclick="loadPreCutTargets(${preCutPage + 1})" ${end >= total ? 'disabled' : ''}>Next</button>
+                </div>`;
+        }
+
+        function exportPreCutTargets() {
+            if (!preCutData.length) return;
+            const headers = ['Address','City','Zip','Price Band','List Price','DOM','List Date','Agent','Phone','Office','Beds','Baths','SqFt'];
+            const rows = preCutData.map(d => [
+                d.address, d.city, d.zip_code, d.price_band,
+                d.current_price, d.dom, d.list_date,
+                d.list_agent_name, d.list_agent_phone, d.list_office_name,
+                d.beds, d.baths, d.sqft
+            ].map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(','));
+            const csv = [headers.join(','), ...rows].join('\n');
+            const a = document.createElement('a');
+            a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+            a.download = 'precut-targets-' + new Date().toISOString().slice(0,10) + '.csv';
+            a.click();
+        }
+
+        // =====================================================================
+        // Best Value vs. Local Comps
+        // =====================================================================
+        let bvData = [];
+        let bvPage = 0;
+        const bvPageSize = 25;
+
+        async function loadBestValue(page) {
+            if (page !== undefined) { bvPage = page; renderBestValue(); return; }
+            bvPage = 0;
+            const container = document.getElementById('bestValueContainer');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading best-value listings...</div>';
+            const city = document.getElementById('bvCity').value || null;
+            const [priceMin, priceMax] = document.getElementById('bvPriceRange').value.split('-').map(Number);
+            const minDisc = parseFloat(document.getElementById('bvMinDiscount').value);
+            const includeReview = document.getElementById('bvIncludeReview').checked;
+            try {
+                const data = await rpcWithTimeout('get_best_value', {
+                    p_city: city,
+                    p_price_min: priceMin,
+                    p_price_max: priceMax,
+                    p_min_discount: minDisc,
+                    p_limit: 500,
+                    p_include_review: includeReview
+                }, 30000);
+                bvData = data || [];
+                document.getElementById('bvCount').textContent = bvData.length.toLocaleString() + ' listings';
+                renderBestValue();
+            } catch (e) {
+                container.innerHTML = '<div style="color:#ef4444;padding:12px">Error: ' + e.message + '</div>';
+            }
+        }
+
+        function renderBestValue() {
+            const container = document.getElementById('bestValueContainer');
+            if (!bvData.length) {
+                container.innerHTML = '<div style="color:#94a3b8;padding:12px">No listings match these filters. Try widening the discount or price range.</div>';
+                return;
+            }
+            const sortKey = document.getElementById('bvSort').value;
+            const sorted = bvData.slice().sort((a, b) => {
+                if (sortKey === 'gap')   return Number(b.dollar_gap) - Number(a.dollar_gap);
+                if (sortKey === 'dom')   return Number(b.dom) - Number(a.dom);
+                if (sortKey === 'price') return Number(a.list_price) - Number(b.list_price);
+                return Number(b.discount_pct) - Number(a.discount_pct);
+            });
+            const total = sorted.length;
+            const start = bvPage * bvPageSize;
+            const end = Math.min(start + bvPageSize, total);
+            const pageData = sorted.slice(start, end);
+            const rows = pageData.map(d => {
+                const disc = Number(d.discount_pct);
+                const discClass = disc >= 25 ? 'color:#22c55e;font-weight:700'
+                                : disc >= 15 ? 'color:#4ade80;font-weight:600'
+                                : disc >= 8  ? 'color:#eab308'
+                                : 'color:#94a3b8';
+                const flagBadge = d.flag === 'review'
+                        ? ' <span style="font-size:10px;background:#7c2d12;color:#fdba74;padding:1px 5px;border-radius:3px" title="Discount &gt;45% — verify comps before pitching">review</span>'
+                        : d.flag === 'thin'
+                        ? ' <span style="font-size:10px;background:#334155;color:#94a3b8;padding:1px 5px;border-radius:3px" title="Fewer than 8 comps">thin</span>'
+                        : '';
+                const area = String(d.area_label || d.subdivision || '').replace(/</g, '&lt;');
+                return `<tr style="cursor:pointer" onclick="openBestValue('${d.ref_code}')" title="Open the exact property">
+                    <td style="font-weight:600">${area}${flagBadge}</td>
+                    <td>${d.property_type || ''}</td>
+                    <td style="text-align:center">${d.beds ?? '—'}/${d.baths ?? '—'}</td>
+                    <td style="text-align:right">${d.sqft ? Number(d.sqft).toLocaleString() : '—'}</td>
+                    <td style="text-align:right">$${Number(d.list_price).toLocaleString()}</td>
+                    <td style="text-align:right">$${Number(d.subj_ppsf).toLocaleString()}</td>
+                    <td style="text-align:right;color:#94a3b8">$${Number(d.comp_med_ppsf).toLocaleString()}</td>
+                    <td style="text-align:right;${discClass}">${disc}%</td>
+                    <td style="text-align:right;color:#22c55e">$${Number(d.dollar_gap).toLocaleString()}</td>
+                    <td style="text-align:center;color:#94a3b8">${d.n_comps}</td>
+                    <td style="text-align:center">${d.dom}</td>
+                    <td style="font-family:monospace;font-size:11px;color:#94a3b8">${d.ref_code}</td>
+                </tr>`;
+            }).join('');
+            container.innerHTML = `
+                <div style="overflow-x:auto">
+                <table>
+                    <thead><tr>
+                        <th>Area</th><th>Type</th>
+                        <th style="text-align:center">Bd/Ba</th>
+                        <th style="text-align:right">SqFt</th>
+                        <th style="text-align:right">List $</th>
+                        <th style="text-align:right">$/SqFt</th>
+                        <th style="text-align:right">Comp $/SqFt</th>
+                        <th style="text-align:right">Disc %</th>
+                        <th style="text-align:right">$ Gap</th>
+                        <th style="text-align:center">Comps</th>
+                        <th style="text-align:center">DOM</th>
+                        <th>Ref</th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+                </div>
+                <div class="pagination">
+                    <button class="btn btn-outline" onclick="loadBestValue(${bvPage - 1})" ${bvPage === 0 ? 'disabled' : ''}>Prev</button>
+                    <span>Showing ${start + 1}–${end} of ${total.toLocaleString()}</span>
+                    <button class="btn btn-outline" onclick="loadBestValue(${bvPage + 1})" ${end >= total ? 'disabled' : ''}>Next</button>
+                </div>
+                <p style="color:#64748b;font-size:11px;margin:8px 0 0">
+                    Discount = subject $/SqFt vs. the median of SOLD comps within &frac12; mi (same type, beds &plusmn;1, size &plusmn;20%, &plusmn;15 yr).
+                    "review" = discount &gt;45% (verify before pitching). Click a row to open the exact property; the Ref code resolves it in the /bestvalue Telegram tool.
+                </p>`;
+        }
+
+        function exportBestValue() {
+            if (!bvData.length) return;
+            const headers = ['Ref','Area','City','Type','Beds','Baths','SqFt','List Price','$/SqFt','Comp $/SqFt','Discount %','$ Gap','Comps','DOM','Flag'];
+            const rows = bvData.map(d => [
+                d.ref_code, d.area_label, d.city, d.property_type, d.beds, d.baths, d.sqft,
+                d.list_price, d.subj_ppsf, d.comp_med_ppsf, d.discount_pct, d.dollar_gap, d.n_comps, d.dom, d.flag
+            ].map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(','));
+            const csv = [headers.join(','), ...rows].join('\n');
+            const a = document.createElement('a');
+            a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+            a.download = 'best-value-' + new Date().toISOString().slice(0,10) + '.csv';
+            a.click();
+        }
+
+        // Resolve a ref code to the exact property and open it in Property Intelligence.
+        async function openBestValue(ref) {
+            try {
+                const data = await rpcWithTimeout('resolve_best_value', { p_ref: ref }, 15000);
+                if (!data || !data.length || !data[0].address) {
+                    alert('Could not resolve ' + ref + ' (the listing may no longer be active).');
+                    return;
+                }
+                const input = document.getElementById('propertySearch');
+                if (input) {
+                    input.value = data[0].address;
+                    input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                searchProperty();
+            } catch (e) {
+                alert('Resolve failed: ' + e.message);
+            }
         }
 
         // Check for existing session on load
