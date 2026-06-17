@@ -1631,7 +1631,7 @@
                 const startDate = document.getElementById('startDate').value;
                 const endDate = document.getElementById('endDate').value;
 
-                const [activeRes, salesRes, hiddenRes, activeTrendRes, salesTrendRes, atListRes] = await Promise.all([
+                const [activeRes, salesRes, hiddenRes, activeTrendRes, salesTrendRes, atListRes, ppsfRes] = await Promise.all([
                     sb.rpc('get_active_summary'),
                     sb.rpc('get_sales_summary', {
                         p_start_date: startDate,
@@ -1644,6 +1644,10 @@
                         p_end_date: endDate
                     }),
                     sb.rpc('get_sold_at_list_summary', {
+                        p_start_date: startDate,
+                        p_end_date: endDate
+                    }),
+                    sb.rpc('get_sold_ppsf', {
                         p_start_date: startDate,
                         p_end_date: endDate
                     })
@@ -1683,7 +1687,9 @@
                 document.getElementById('freshness').textContent =
                     'Sales window: ' + formatDateRange(startDate, endDate);
 
-                renderKPIs(active, sales, hidden, soldAtListPct, soldAtListCount, soldAtListTotal, soldAboveList, soldExactlyAtList);
+                const ppsf = (ppsfRes && !ppsfRes.error && ppsfRes.data && ppsfRes.data[0]) ? ppsfRes.data[0] : null;
+
+                renderKPIs(active, sales, hidden, soldAtListPct, soldAtListCount, soldAtListTotal, soldAboveList, soldExactlyAtList, ppsf);
                 renderCharts(active, sales);
                 renderTable(active, sales);
                 renderHiddenDom(hidden);
@@ -1706,7 +1712,7 @@
         // =====================================================================
         // KPI Cards
         // =====================================================================
-        function renderKPIs(active, sales, hidden, soldAtListPct, soldAtListCount, soldAtListTotal, soldAboveList, soldExactlyAtList) {
+        function renderKPIs(active, sales, hidden, soldAtListPct, soldAtListCount, soldAtListTotal, soldAboveList, soldExactlyAtList, ppsf) {
             const totalActive = active.reduce((s, r) => s + Number(r.listing_count), 0);
             const totalSold = sales.reduce((s, r) => s + Number(r.sold_count), 0);
             const totalUC = active.reduce((s, r) => s + Number(r.uc_count || 0), 0);
@@ -1754,6 +1760,11 @@
                     <div class="kpi-label">Avg Sold Price</div>
                     <div class="kpi-value">${fmt$(avgSoldPrice)}</div>
                     <div class="kpi-sub">DOM: ${fmtDom(avgSoldDom)}${avgSoldHidden > 0 ? ` (+${avgSoldHidden} hidden)` : ''} &bull; ${fmt$(avgSoldToList > 0 ? avgSoldPrice / (avgSoldToList / 100) - avgSoldPrice : 0)} avg discount</div>
+                </div>
+                <div class="kpi-card" title="Median sold price per square foot for closed sales (S/H) in Las Vegas + Henderson over the selected window. Sub-line shows the full MLS market for context.">
+                    <div class="kpi-label">Median $/SqFt (LV + Henderson)</div>
+                    <div class="kpi-value">${ppsf && ppsf.target_median ? '$' + fmtN(ppsf.target_median) : '—'}</div>
+                    <div class="kpi-sub">${ppsf && ppsf.target_median ? `${fmtN(ppsf.target_n)} sales &bull; $${fmtN(ppsf.target_avg)} avg &bull; Market: $${fmtN(ppsf.market_median)} med / $${fmtN(ppsf.market_avg)} avg` : 'No data in period'}</div>
                 </div>
                 <div class="kpi-card">
                     <div class="kpi-label">Avg Discount</div>
