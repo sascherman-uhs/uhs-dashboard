@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UHS MLS Market Summary</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <style>
@@ -844,6 +845,62 @@
         }
         a.redfin-link:hover { color: var(--gold-dark); text-decoration: underline; }
 
+        /* Open Houses section */
+        .oh-controls {
+            display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+            margin-bottom: 14px; font-size: 13px;
+        }
+        .oh-controls label { display: flex; align-items: center; gap: 5px; color: var(--gray-600); }
+        .oh-controls select, .oh-controls input[type="date"] {
+            padding: 5px 8px; border: 1px solid var(--gray-300); border-radius: 6px;
+            font-size: 13px; background: white; color: var(--navy);
+        }
+        .oh-sep { width: 1px; height: 22px; background: var(--gray-200); }
+        .oh-presets { display: flex; gap: 6px; }
+        .oh-preset {
+            padding: 5px 11px; border: 1px solid var(--gray-300); border-radius: 14px;
+            background: white; color: var(--gray-600); font-size: 12.5px; cursor: pointer;
+        }
+        .oh-preset:hover { border-color: var(--gold-dark); color: var(--gold-dark); }
+        .oh-preset.active { background: var(--navy); border-color: var(--navy); color: white; }
+        .oh-check { cursor: pointer; user-select: none; }
+        .oh-badge {
+            display: inline-block; padding: 1px 7px; border-radius: 9px;
+            font-size: 10.5px; font-weight: 700; letter-spacing: 0.3px; vertical-align: 1px;
+        }
+        .oh-badge-warm { background: var(--gold); color: var(--navy); }
+        .oh-badge-vacant { background: #e8f0e8; color: #2e6b34; }
+        .oh-badge-type { background: var(--gray-100); color: var(--gray-600); font-weight: 600; }
+        .oh-badge-staged { background: #fdeaea; color: #a33; }
+        .oh-day-header {
+            background: var(--gray-50); font-weight: 700; color: var(--navy);
+            padding: 7px 10px; text-align: left; border-top: 2px solid var(--gray-200);
+        }
+        tr.oh-row-warm td { background: #fdf8ee; }
+        tr.oh-row-sel td { background: #eaf1fa !important; }
+        .oh-scroll { max-height: 80vh; overflow: auto; }
+        .oh-scroll thead th {
+            position: sticky; top: 0; z-index: 3;
+            background: white; box-shadow: 0 2px 0 var(--gray-200);
+        }
+        .oh-routebar {
+            display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+            margin-bottom: 12px; padding: 8px 12px; font-size: 13px;
+            background: var(--gray-50); border: 1px solid var(--gray-200);
+            border-radius: 8px; color: var(--gray-600);
+        }
+        .oh-routebar .btn-sm {
+            padding: 5px 11px; border: 1px solid var(--gray-300); border-radius: 14px;
+            background: white; color: var(--navy); font-size: 12.5px; cursor: pointer;
+        }
+        .oh-routebar .btn-sm:hover { border-color: var(--gold-dark); color: var(--gold-dark); }
+        .oh-routebar input[type="number"] {
+            width: 52px; padding: 4px 6px; border: 1px solid var(--gray-300);
+            border-radius: 6px; font-size: 13px;
+        }
+        .oh-routebar a { color: var(--gold-dark); font-weight: 600; text-decoration: none; }
+        .oh-routebar a:hover { text-decoration: underline; }
+
         /* Agent pagination */
         .pagination {
             display: flex;
@@ -1108,6 +1165,145 @@
             <div id="priceRangeListingsContainer"></div>
         </div>
 
+        <!-- Market Pressure Widget -->
+        <div class="section-divider">
+            <h2><span>Market</span> Pressure</h2>
+        </div>
+        <div class="kpi-grid" id="marketPressureGrid">
+            <div class="loading"><div class="spinner"></div>Loading market pressure...</div>
+        </div>
+
+        <!-- Open Houses Section -->
+        <div class="section-divider">
+            <h2><span>Open</span> Houses</h2>
+        </div>
+
+        <div class="kpi-grid" id="ohKpiGrid">
+            <div class="loading"><div class="spinner"></div>Loading open houses...</div>
+        </div>
+
+        <div class="table-card" style="margin-bottom: 28px">
+            <div class="oh-controls">
+                <div class="oh-presets">
+                    <button class="oh-preset" data-preset="today" onclick="ohPreset('today', this)">Today</button>
+                    <button class="oh-preset" data-preset="weekend" onclick="ohPreset('weekend', this)">This Weekend</button>
+                    <button class="oh-preset active" data-preset="week" onclick="ohPreset('week', this)">Next 7 Days</button>
+                    <button class="oh-preset" data-preset="twoweek" onclick="ohPreset('twoweek', this)">Next 14 Days</button>
+                </div>
+                <label>From <input type="date" id="ohStart"></label>
+                <label>To <input type="date" id="ohEnd"></label>
+                <button class="btn btn-gold" onclick="loadOpenHouses()">Update</button>
+                <span class="oh-sep"></span>
+                <label>Sort
+                    <select id="ohSort" onchange="ohColSort=null;renderOpenHouses()">
+                        <option value="warm">Warm agents first</option>
+                        <option value="date">Date / time</option>
+                        <option value="address">Address</option>
+                        <option value="zip">ZIP code</option>
+                        <option value="subdivision">Neighborhood</option>
+                        <option value="agent">Listing agent</option>
+                        <option value="price">Price (high→low)</option>
+                    </select>
+                </label>
+                <label>Group
+                    <select id="ohGroup" onchange="renderOpenHouses()">
+                        <option value="day">By day</option>
+                        <option value="zip">By ZIP</option>
+                        <option value="none">Flat list</option>
+                    </select>
+                </label>
+                <label class="oh-check"><input type="checkbox" id="ohWarmOnly" onchange="renderOpenHouses()"> Warm only</label>
+                <label class="oh-check"><input type="checkbox" id="ohVacantOnly" onchange="renderOpenHouses()"> Vacant only</label>
+                <label class="oh-check"><input type="checkbox" id="ohPublicOnly" onchange="renderOpenHouses()"> Public only</label>
+                <label>Price
+                    <select id="ohPriceDir" onchange="renderOpenHouses()">
+                        <option value="">Any</option>
+                        <option value="min">At least</option>
+                        <option value="max">At most</option>
+                    </select>
+                    <input type="text" id="ohPriceAmt" placeholder="e.g. 750k" style="width:72px"
+                        onchange="renderOpenHouses()" onkeyup="if(event.key==='Enter')renderOpenHouses()">
+                </label>
+            </div>
+            <div class="oh-routebar" id="ohRouteBar">
+                <strong style="color:var(--navy)">🗺 Card-Drop Route</strong>
+                <label class="oh-check">Stops <input type="number" id="ohStopN" value="12" min="2" max="20"></label>
+                <button class="btn-sm" onclick="ohAutoCluster()">Auto-pick tightest cluster</button>
+                <span id="ohRouteSummary">No stops selected — tick rows below or auto-pick</span>
+                <button class="btn-sm" id="ohRouteClear" onclick="ohClearSel()" style="display:none">Clear</button>
+            </div>
+            <div id="ohContainer">
+                <div class="loading"><div class="spinner"></div>Loading open houses...</div>
+            </div>
+        </div>
+
+        <!-- Short Sales Section -->
+        <div class="section-divider">
+            <h2><span>Short</span> Sales — Active</h2>
+        </div>
+
+        <div class="kpi-grid" id="ssKpiGrid">
+            <div class="loading"><div class="spinner"></div>Loading short sales...</div>
+        </div>
+
+        <div class="table-card" style="margin-bottom: 28px">
+            <div class="oh-controls">
+                <label>Sort
+                    <select id="ssSort" onchange="ssColSort=null;renderShortSales()">
+                        <option value="dom">DOM (highest first)</option>
+                        <option value="warm">Warm agents first</option>
+                        <option value="price">Price (high→low)</option>
+                        <option value="address">Address</option>
+                        <option value="zip">ZIP code</option>
+                        <option value="subdivision">Neighborhood</option>
+                        <option value="agent">Listing agent</option>
+                    </select>
+                </label>
+                <button class="btn btn-gold" onclick="loadShortSales()">Refresh</button>
+                <span class="oh-sep"></span>
+                <label class="oh-check"><input type="checkbox" id="ssWarmOnly" onchange="renderShortSales()"> Warm only</label>
+                <label class="oh-check"><input type="checkbox" id="ssVacantOnly" onchange="renderShortSales()"> Vacant only</label>
+                <label class="oh-check"><input type="checkbox" id="ssUnstagedOnly" onchange="renderShortSales()"> Unstaged only</label>
+            </div>
+            <div id="ssContainer">
+                <div class="loading"><div class="spinner"></div>Loading short sales...</div>
+            </div>
+        </div>
+
+        <!-- Foreclosures & REO Section -->
+        <div class="section-divider">
+            <h2><span>Foreclosures</span> &amp; REO — Active</h2>
+        </div>
+
+        <div class="kpi-grid" id="fcKpiGrid">
+            <div class="loading"><div class="spinner"></div>Loading foreclosures...</div>
+        </div>
+
+        <div class="table-card" style="margin-bottom: 28px">
+            <div class="oh-controls">
+                <label>Sort
+                    <select id="fcSort" onchange="fcColSort=null;renderForeclosures()">
+                        <option value="dom">DOM (highest first)</option>
+                        <option value="warm">Warm agents first</option>
+                        <option value="price">Price (high→low)</option>
+                        <option value="address">Address</option>
+                        <option value="zip">ZIP code</option>
+                        <option value="subdivision">Neighborhood</option>
+                        <option value="agent">Listing agent</option>
+                    </select>
+                </label>
+                <button class="btn btn-gold" onclick="loadForeclosures()">Refresh</button>
+                <span class="oh-sep"></span>
+                <label class="oh-check"><input type="checkbox" id="fcWarmOnly" onchange="renderForeclosures()"> Warm only</label>
+                <label class="oh-check"><input type="checkbox" id="fcVacantOnly" onchange="renderForeclosures()"> Vacant only</label>
+                <label class="oh-check"><input type="checkbox" id="fcUnstagedOnly" onchange="renderForeclosures()"> Unstaged only</label>
+                <label class="oh-check"><input type="checkbox" id="fcReoOnly" onchange="renderForeclosures()"> REO only</label>
+            </div>
+            <div id="fcContainer">
+                <div class="loading"><div class="spinner"></div>Loading foreclosures...</div>
+            </div>
+        </div>
+
         <!-- Monthly Volume Section -->
         <div class="section-divider">
             <h2><span>Monthly</span> Volume History</h2>
@@ -1188,6 +1384,32 @@
             <h3 id="topAgentsTitle">Top Agents by Active Listings</h3>
             <div id="topAgentsContainer">
                 <div class="loading"><div class="spinner"></div>Loading agents...</div>
+            </div>
+        </div>
+
+        <!-- Client Agents Section -->
+        <div class="section-divider">
+            <h2><span>Client</span> Agents</h2>
+        </div>
+
+        <div class="table-card" style="margin-bottom:20px">
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:10px">
+                <h3 style="margin:0">Previous Clients &amp; Inquiries — Listing Activity</h3>
+                <span style="color:#94a3b8; font-size:12px; font-style:italic">Agents who staged with us or sent an inquiry, matched to their MLS listings. Click an agent or a struggling listing to open them in Agent Intelligence. Refreshed nightly.</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px">
+                <select id="caRelationship" onchange="loadClientAgents()" style="padding:4px 8px; border-radius:4px; border:1px solid #334155; background:#1e293b; color:#e2e8f0; font-size:13px">
+                    <option value="all" selected>Clients + Inquiries</option>
+                    <option value="client">Staging Clients only</option>
+                    <option value="inquiry">Inquiries only</option>
+                </select>
+                <label style="color:#94a3b8; font-size:12px; display:flex; align-items:center; gap:4px; cursor:pointer">
+                    <input type="checkbox" id="caActiveOnly" onchange="renderClientAgents()" checked> with active listings only
+                </label>
+                <span id="caCount" style="color:#94a3b8; font-size:13px"></span>
+            </div>
+            <div id="clientAgentsContainer">
+                <div class="loading"><div class="spinner"></div>Loading client agents...</div>
             </div>
         </div>
 
@@ -1362,7 +1584,7 @@
                     <option value="20">20%+ under comps</option>
                     <option value="25">25%+ under comps</option>
                 </select>
-                <select id="bvSort" onchange="renderBestValue()" style="padding:4px 8px; border-radius:4px; border:1px solid #334155; background:#1e293b; color:#e2e8f0; font-size:13px">
+                <select id="bvSort" onchange="bvSortCol=null; renderBestValue()" style="padding:4px 8px; border-radius:4px; border:1px solid #334155; background:#1e293b; color:#e2e8f0; font-size:13px">
                     <option value="discount">Sort: Discount %</option>
                     <option value="gap">Sort: $ Gap</option>
                     <option value="dom">Sort: Days on Market</option>
@@ -1603,6 +1825,42 @@
         // =====================================================================
         // Load data from Supabase RPC
         // =====================================================================
+        // =====================================================================
+        // Market Pressure Widget
+        // =====================================================================
+        function renderMarketPressure(pressureData) {
+            if (!pressureData || pressureData.length === 0) {
+                document.getElementById('marketPressureGrid').innerHTML =
+                    '<div class="error-msg">No market pressure data available</div>';
+                return;
+            }
+            const data = pressureData[0];
+            const pctReduced = data.pct_with_reductions ? parseFloat(data.pct_with_reductions).toFixed(1) : '0';
+            const avgReduction = data.avg_reduction_dollars ? Math.round(data.avg_reduction_dollars) : 0;
+            const avgReductionPct = data.avg_reduction_pct ? parseFloat(data.avg_reduction_pct).toFixed(1) : '0';
+            const trend = data.trend_direction || 'stable';
+            const trendLabel = trend === 'increasing' ? '↑ Increasing' : trend === 'decreasing' ? '↓ Decreasing' : '→ Stable';
+            const trendColor = trend === 'increasing' ? '#ef4444' : trend === 'decreasing' ? '#22c55e' : '#9ba0a8';
+
+            document.getElementById('marketPressureGrid').innerHTML = `
+                <div class="kpi-card">
+                    <div class="kpi-label">Active w/ Reductions</div>
+                    <div class="kpi-value">${pctReduced}%</div>
+                    <div class="kpi-sub">${pctReduced}% of active inventory</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Avg Reduction</div>
+                    <div class="kpi-value">${fmt$(avgReduction)}</div>
+                    <div class="kpi-sub">${avgReductionPct}% average cut</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Weekly Trend</div>
+                    <div class="kpi-value" style="color: ${trendColor}">${trendLabel}</div>
+                    <div class="kpi-sub">vs. prior week</div>
+                </div>
+            `;
+        }
+
         async function loadData() {
             try {
                 // Fetch freshness via get_import_coverage RPC. Using the RPC instead
@@ -1631,26 +1889,23 @@
                 const startDate = document.getElementById('startDate').value;
                 const endDate = document.getElementById('endDate').value;
 
-                const [activeRes, salesRes, hiddenRes, activeTrendRes, salesTrendRes, atListRes, ppsfRes] = await Promise.all([
-                    sb.rpc('get_active_summary'),
-                    sb.rpc('get_sales_summary', {
-                        p_start_date: startDate,
-                        p_end_date: endDate
-                    }),
-                    sb.rpc('get_hidden_dom_summary'),
-                    sb.rpc('get_active_trend'),
-                    sb.rpc('get_sales_trend', {
-                        p_start_date: startDate,
-                        p_end_date: endDate
-                    }),
-                    sb.rpc('get_sold_at_list_summary', {
-                        p_start_date: startDate,
-                        p_end_date: endDate
-                    }),
-                    sb.rpc('get_sold_ppsf', {
-                        p_start_date: startDate,
-                        p_end_date: endDate
-                    })
+                // safeRpc catches network-level fetch rejections (e.g. Safari mobile
+                // "Load failed" when concurrent connections exceed the browser limit).
+                // Returns {data:null, error:e} so callers treat it like a soft Supabase error.
+                const safeRpc = async (name, params) => {
+                    try { return await (params ? sb.rpc(name, params) : sb.rpc(name)); }
+                    catch (e) { console.warn('rpc network fail:', name, e); return { data: null, error: e }; }
+                };
+
+                const [activeRes, salesRes, hiddenRes, activeTrendRes, salesTrendRes, atListRes, ppsfRes, pressureRes] = await Promise.all([
+                    safeRpc('get_active_summary'),
+                    safeRpc('get_sales_summary', { p_start_date: startDate, p_end_date: endDate }),
+                    safeRpc('get_hidden_dom_summary'),
+                    safeRpc('get_active_trend'),
+                    safeRpc('get_sales_trend', { p_start_date: startDate, p_end_date: endDate }),
+                    safeRpc('get_sold_at_list_summary', { p_start_date: startDate, p_end_date: endDate }),
+                    safeRpc('get_sold_ppsf', { p_start_date: startDate, p_end_date: endDate }),
+                    safeRpc('get_market_pressure_dashboard')
                 ]);
 
                 if (activeRes.error) throw activeRes.error;
@@ -1690,6 +1945,8 @@
                 const ppsf = (ppsfRes && !ppsfRes.error && ppsfRes.data && ppsfRes.data[0]) ? ppsfRes.data[0] : null;
 
                 renderKPIs(active, sales, hidden, soldAtListPct, soldAtListCount, soldAtListTotal, soldAboveList, soldExactlyAtList, ppsf);
+                const pressure = pressureRes.error ? [] : (pressureRes.data || []);
+                renderMarketPressure(pressure);
                 renderCharts(active, sales);
                 renderTable(active, sales);
                 renderHiddenDom(hidden);
@@ -2826,6 +3083,20 @@
             const buyerSoldSub = buyerSold > 0 ? `<div class="sub">${buyerSold} buyer</div>` : '';
             const buyerVolSub = buyerVol > 0 ? `<div class="sub">${fmt$(buyerVol)} buyer</div>` : '';
 
+            // Prior full calendar year production (listing side). Use summary when
+            // available (accurate across the full DB); fall back to the loaded
+            // listings by close_date when there's no summary.
+            const lastYear = summary && summary.last_year ? Number(summary.last_year) : (new Date().getFullYear() - 1);
+            let lyCount, lyVol;
+            if (summary && summary.last_year_sold_count != null) {
+                lyCount = Number(summary.last_year_sold_count);
+                lyVol = Number(summary.last_year_sold_volume || 0);
+            } else {
+                const lySold = soldListings.filter(l => l.close_date && new Date(l.close_date + 'T00:00:00').getFullYear() === lastYear);
+                lyCount = lySold.length;
+                lyVol = lySold.reduce((s, l) => s + Number(l.sold_price || l.current_price || 0), 0);
+            }
+
             // Combined total KPI (only show if there are buyer deals)
             const totalDeals = totalSold + buyerSold;
             const totalVol = soldVol + buyerVol;
@@ -2871,6 +3142,14 @@
                         <div class="agent-kpi">
                             <div class="val">${avgDom}</div>
                             <div class="lbl">Avg DOM</div>
+                        </div>
+                        <div class="agent-kpi" style="border-left:1px solid var(--gray-200); padding-left:20px">
+                            <div class="val">${lyCount}</div>
+                            <div class="lbl">${lastYear} Sold</div>
+                        </div>
+                        <div class="agent-kpi">
+                            <div class="val">${fmt$(lyVol)}</div>
+                            <div class="lbl">${lastYear} Vol</div>
                         </div>${totalKpi}
                     </div>
                 </div>`;
@@ -2950,6 +3229,7 @@
                 return `
                 <tr>
                     <td style="text-align:left">${statusBadge(l.status)}</td>
+                    <td>${clsChipHtml(l.mls_number)}</td>
                     <td style="text-align:left">${l.address || '—'}</td>
                     <td style="text-align:left">${l.city || ''}</td>
                     <td><a class="mls-link" href="https://www.google.com/search?q=MLS+${l.mls_number}+Las+Vegas+NV" target="_blank" title="Search MLS# on Google">${l.mls_number}</a></td>
@@ -2969,6 +3249,7 @@
                 <thead>
                     <tr>
                         <th style="text-align:left">Status</th>
+                        <th title="Staging classification — shared with the uhsEstimate dashboard">Class</th>
                         <th style="text-align:left">Address</th>
                         <th style="text-align:left">City</th>
                         <th>MLS#</th>
@@ -2990,6 +3271,233 @@
                 <span>Showing ${start + 1}\u2013${end} of ${total} &nbsp; (Page ${currentPage} of ${totalPages})</span>
                 <button class="btn btn-outline" onclick="renderAgentListings(agentListingsData,${agentListingsPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}>Next</button>
             </div>`;
+
+            paintListingClassChips(pageListings.map(l => l.mls_number));
+        }
+
+        // =====================================================================
+        // Listing classification — same system as the uhsEstimate dashboard.
+        // Writes via the shared classify_listing / record_human_label RPCs, so a
+        // verdict set here (or there) shows up everywhere. Tables:
+        // listing_classifications, photo_classifications.
+        // =====================================================================
+        const CLS_META = {
+            STAGED_COMPETITOR:  { label: 'Competitor',         bg: '#dc2626' },
+            VIRTUALLY_STAGED:   { label: 'Virtual',            bg: '#7c3aed' },
+            VIRTUAL_STAGING:    { label: 'Virtual',            bg: '#7c3aed' },
+            OWNER_FURNISHED:    { label: 'Owner Furnished',    bg: '#b45309' },
+            VACANT:             { label: 'Vacant',             bg: '#6b7280' },
+            STAGED_UHS:         { label: 'UHS Staged',         bg: '#059669' },
+            PHYSICAL_STAGING:   { label: 'Staged',             bg: '#059669' },
+            UNABLE_TO_CLASSIFY: { label: 'Unable to Classify', bg: '#9ca3af' },
+            EXTERIOR:           { label: 'Exterior',           bg: '#0284c7' },
+            OTHER:              { label: 'Other',              bg: '#9ca3af' }
+        };
+        // mls_number -> { classification, source } (null = confirmed unclassified)
+        const listingClsCache = new Map();
+
+        function clsChipHtml(mls) {
+            const cached = listingClsCache.get(mls);
+            let inner;
+            if (cached && cached.classification) {
+                const m = CLS_META[cached.classification] || { label: cached.classification.replace(/_/g, ' '), bg: '#6b7280' };
+                inner = `<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;color:#fff;background:${m.bg};white-space:nowrap">${m.label}${cached.source === 'MANUAL' ? ' 🔒' : ''}</span>`;
+            } else {
+                inner = `<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;color:var(--gray-400);border:1px dashed var(--gray-200);white-space:nowrap">Classify →</span>`;
+            }
+            return `<span class="cls-chip" data-mls="${mls}" onclick="openListingReview('${mls}')" style="cursor:pointer" title="Review & classify staging status">${inner}</span>`;
+        }
+
+        function repaintClsChip(mls) {
+            document.querySelectorAll(`.cls-chip[data-mls="${mls}"]`).forEach(el => {
+                el.outerHTML = clsChipHtml(mls);
+            });
+        }
+
+        async function paintListingClassChips(mlsNumbers) {
+            const missing = mlsNumbers.filter(m => m && !listingClsCache.has(m));
+            if (missing.length) {
+                try {
+                    const { data, error } = await sb.from('listing_classifications')
+                        .select('mls_number,classification,classification_source')
+                        .in('mls_number', missing);
+                    if (error) throw error;
+                    const found = new Map((data || []).map(r => [r.mls_number, r]));
+                    missing.forEach(m => {
+                        const r = found.get(m);
+                        listingClsCache.set(m, r ? { classification: r.classification, source: r.classification_source } : null);
+                    });
+                } catch (e) { return; /* leave chips as "Classify →" */ }
+            }
+            mlsNumbers.forEach(repaintClsChip);
+        }
+
+        function buildListingLinks(addr, city, zip, mls) {
+            const parts = [addr, city, 'NV', zip].filter(Boolean);
+            const full = parts.join(', ');
+            const q = encodeURIComponent(full);
+            const slug = parts.join(' ').replace(/#/g, '').replace(/[.,]/g, '').trim().replace(/\s+/g, '-');
+            return {
+                mls: mls ? `https://www.google.com/search?q=${encodeURIComponent('GLVAR MLS ' + mls + ' ' + (city || 'Las Vegas') + ' NV')}` : `https://www.google.com/search?q=${q}`,
+                google: `https://www.google.com/search?q=${q}`,
+                redfin: `https://www.google.com/search?q=${encodeURIComponent(full + ' site:redfin.com')}`,
+                zillow: `https://www.zillow.com/homes/${slug}_rb/`
+            };
+        }
+
+        function showClsToast(msg, type) {
+            const t = document.createElement('div');
+            t.textContent = msg;
+            t.style.cssText = `position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:10001;padding:10px 18px;border-radius:6px;font-size:13px;font-weight:600;color:#fff;box-shadow:0 4px 16px rgba(0,0,0,.25);background:${type === 'error' ? '#dc2626' : type === 'info' ? '#374151' : '#059669'}`;
+            document.body.appendChild(t);
+            setTimeout(() => t.remove(), 3200);
+        }
+
+        // Review & classify dialog — mirrors the uhsEstimate proximity-review modal.
+        async function openListingReview(mls) {
+            const l = (agentListingsData || []).find(x => x.mls_number === mls) || {};
+            const addr = `${l.address || ''}${l.city ? ', ' + l.city : ''}`;
+            const links = buildListingLinks(l.address, l.city, l.zip_code, mls);
+            const price = Number(l.sold_price || l.current_price || 0);
+
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px';
+            overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+            const linkBtn = (href, label) => `<a href="${href}" target="_blank" style="display:inline-block;font-size:11px;padding:4px 10px;border:1px solid var(--gray-200);border-radius:5px;text-decoration:none;color:var(--gray-800);background:#fff">${label}</a>`;
+            const secHead = txt => `<div style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">${txt}</div>`;
+            overlay.innerHTML = `
+                <div style="background:white;border-radius:10px;max-width:760px;width:100%;max-height:88vh;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,0.3)">
+                    <div style="padding:16px 20px;border-bottom:1px solid var(--gray-200);display:flex;justify-content:space-between;align-items:flex-start">
+                        <div>
+                            <div style="font-weight:700;font-size:15px">${addr || '—'}</div>
+                            <div style="font-size:11px;color:var(--gray-400);margin-top:2px">MLS# ${mls} · DOM ${l.dom ?? '—'} · ${price ? fmtPrice(price) : '—'}</div>
+                        </div>
+                        <button onclick="this.closest('div[style*=fixed]').remove()" style="font-size:14px;padding:2px 9px;border:1px solid var(--gray-200);border-radius:5px;background:#fff;cursor:pointer">✕</button>
+                    </div>
+                    <div style="padding:16px 20px">
+                        ${secHead('Deeper Dive')}
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px">
+                            ${linkBtn(links.mls, '🏷️ MLS')}${linkBtn(links.google, '🔎 Google')}${linkBtn(links.redfin, '🔴 Redfin')}${linkBtn(links.zillow, '🏠 Zillow')}
+                        </div>
+                        ${secHead('Already staged?')}
+                        <div id="lsr-class" style="font-size:12px;color:var(--gray-600);margin-bottom:14px">Checking classification…</div>
+                        <div id="lsr-classify" style="margin-bottom:18px"></div>
+                        ${secHead('Photos')}
+                        <div id="lsr-photos" style="font-size:12px;color:var(--gray-600)">Loading photos…</div>
+                    </div>
+                </div>`;
+            document.body.appendChild(overlay);
+
+            const clsEl = overlay.querySelector('#lsr-class');
+            const classifyEl = overlay.querySelector('#lsr-classify');
+            const photosEl = overlay.querySelector('#lsr-photos');
+            let currentCls = null, currentSrc = null;
+
+            function renderClassBadge() {
+                if (currentCls) {
+                    const m = CLS_META[currentCls] || { label: currentCls.replace(/_/g, ' '), bg: '#6b7280' };
+                    const staged = ['STAGED_COMPETITOR', 'PHYSICAL_STAGING', 'STAGED_UHS', 'VIRTUALLY_STAGED', 'VIRTUAL_STAGING', 'OWNER_FURNISHED'].includes(currentCls);
+                    clsEl.innerHTML = `<span style="background:${m.bg};color:white;font-size:11px;padding:2px 8px;border-radius:4px;font-weight:700">${m.label.toUpperCase()}</span>
+                        <span style="color:var(--gray-400);margin-left:6px">${currentSrc === 'MANUAL' ? 'human-confirmed 🔒' : (currentSrc || 'AI')}</span>
+                        ${staged ? '<div style="color:#b45309;margin-top:5px">⚠ Appears to already have staging/furnishings.</div>' : '<div style="color:#166534;margin-top:5px">✓ No competitor/virtual staging detected.</div>'}`;
+                } else {
+                    clsEl.innerHTML = '<span style="background:#9ca3af;color:white;font-size:11px;padding:2px 8px;border-radius:4px;font-weight:700">UNCLASSIFIED</span> <span style="color:var(--gray-400);margin-left:6px">Not yet reviewed — classify it below while you look at the photos.</span>';
+                }
+            }
+
+            function renderClassifyBar() {
+                const opts = [
+                    { code: 'STAGED_COMPETITOR',  label: 'Competitor',         bg: '#dc2626' },
+                    { code: 'VIRTUALLY_STAGED',   label: 'Virtual',            bg: '#7c3aed' },
+                    { code: 'OWNER_FURNISHED',    label: 'Owner Furnished',    bg: '#b45309' },
+                    { code: 'VACANT',             label: 'Vacant',             bg: '#6b7280' },
+                    { code: 'STAGED_UHS',         label: 'UHS Staged',         bg: '#059669' },
+                    { code: 'UNABLE_TO_CLASSIFY', label: 'Unable to Classify', bg: '#9ca3af' },
+                ];
+                const locked = currentSrc === 'MANUAL';
+                const label = locked ? '🔒 Classified:' : (currentCls ? 'Confirm or change:' : 'Classify this listing:');
+                classifyEl.innerHTML = `
+                    ${secHead('Classify')}
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+                        <span style="font-size:11px;color:var(--gray-400);margin-right:2px">${label}</span>
+                        ${opts.map(o => {
+                            const active = currentCls === o.code;
+                            const ob = active ? (locked ? 'outline:2px solid #111;outline-offset:2px;' : 'outline:1px dashed #111;outline-offset:2px;') : '';
+                            return `<button data-code="${o.code}" class="lsr-cls-btn" style="padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;color:#fff;background:${o.bg};border:none;cursor:pointer;${ob}">${o.label}${active && locked ? ' 🔒' : ''}</button>`;
+                        }).join('')}
+                    </div>
+                    <div style="font-size:10px;color:var(--gray-400);margin-top:5px">Locks the listing classification (applies everywhere — this and the estimate dashboard).</div>`;
+                classifyEl.querySelectorAll('.lsr-cls-btn').forEach(b => {
+                    b.addEventListener('click', () => doClassify(b.getAttribute('data-code')));
+                });
+            }
+
+            async function doClassify(code) {
+                const isCorrection = currentCls && currentCls !== code;
+                if (currentCls === code && currentSrc === 'MANUAL') { showClsToast('Already confirmed ' + code.replace(/_/g, ' '), 'info'); return; }
+                try {
+                    let reason = null;
+                    if (isCorrection) {
+                        reason = window.prompt(`Changing ${currentCls.replace(/_/g, ' ')} → ${code.replace(/_/g, ' ')}.\n\nWhich photos / what detail gave it away? (Optional — teaches future AI runs.)`, '');
+                    }
+                    const { error } = await sb.rpc('classify_listing', { p_mls_number: mls, p_classification: code, p_confidence: 1.0, p_source: 'MANUAL' });
+                    if (error) throw error;
+                    await sb.rpc('record_human_label', {
+                        p_mls_number: mls, p_classification: code,
+                        p_notes: isCorrection ? `was ${currentCls}${reason && reason.trim() ? ': ' + reason.trim() : ''}` : 'agent-intel-review',
+                        p_labeled_by: 'agent-intel-review'
+                    });
+                    if (isCorrection) {
+                        await sb.rpc('promote_to_exemplar', {
+                            p_mls_number: mls, p_label: code,
+                            p_discriminator: (reason && reason.trim()) ? reason.trim() : `Reclassified ${currentCls} → ${code} in agent-intel review.`,
+                            p_level: 'LISTING', p_failure_mode: `${currentCls}_to_${code}`, p_added_by: 'agent-intel-review'
+                        });
+                    }
+                    currentCls = code; currentSrc = 'MANUAL';
+                    listingClsCache.set(mls, { classification: code, source: 'MANUAL' });
+                    renderClassBadge(); renderClassifyBar(); repaintClsChip(mls);
+                    showClsToast('Listing classified → ' + code.replace(/_/g, ' ') + ' 🔒', 'success');
+                } catch (e) {
+                    showClsToast('Could not classify: ' + (e.message || e), 'error');
+                }
+            }
+
+            try {
+                const { data: cls } = await sb.from('listing_classifications')
+                    .select('classification,classification_source')
+                    .eq('mls_number', mls).maybeSingle();
+                currentCls = (cls && cls.classification) || null;
+                currentSrc = (cls && cls.classification_source) || null;
+                listingClsCache.set(mls, currentCls ? { classification: currentCls, source: currentSrc } : null);
+                repaintClsChip(mls);
+            } catch (e) { /* non-fatal — treat as unclassified */ }
+            renderClassBadge();
+            renderClassifyBar();
+
+            // Harvested photos (loaded by the estimate pipeline, if any) — read-only.
+            try {
+                const { data: photos } = await sb.from('photo_classifications')
+                    .select('photo_url,classification,corrected_classification,photo_index')
+                    .eq('mls_number', mls).not('photo_url', 'is', null)
+                    .order('photo_index', { ascending: true }).limit(60);
+                if (photos && photos.length) {
+                    photosEl.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px">` +
+                        photos.map(p => {
+                            const c = p.corrected_classification || p.classification;
+                            const m = c ? (CLS_META[c] || { label: c.replace(/_/g, ' '), bg: '#6b7280' }) : null;
+                            return `<a href="${p.photo_url}" target="_blank" style="display:block;border:1px solid var(--gray-200);border-radius:6px;overflow:hidden;text-decoration:none">
+                                <img src="${p.photo_url}" loading="lazy" style="width:100%;height:100px;object-fit:cover;display:block">
+                                ${m ? `<div style="font-size:9px;padding:2px 5px;color:#fff;background:${m.bg}">${m.label}</div>` : ''}
+                            </a>`;
+                        }).join('') + `</div>`;
+                } else {
+                    photosEl.innerHTML = `No photos harvested for this MLS# yet. To avoid ever showing imagery from the wrong home, none are guessed — review the listing directly:
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">${linkBtn(links.mls, '🏷️ MLS')}${linkBtn(links.google, '🔎 Google')}${linkBtn(links.redfin, '🔴 Redfin')}${linkBtn(links.zillow, '🏠 Zillow')}</div>`;
+                }
+            } catch (e) {
+                photosEl.innerHTML = '<span style="color:var(--gray-400)">Could not load photos.</span>';
+            }
         }
 
         function switchAgentListingTab(tab) {
@@ -3260,9 +3768,17 @@
             const zillowUrl = `https://www.zillow.com/homes/${encodeURIComponent(addrSlug + '-' + citySlug + '-NV')}_rb/`;
             const googleUrl = `https://www.google.com/search?q=${encodeURIComponent((p.address || '') + ' ' + (p.city || 'Las Vegas') + ' NV home value')}`;
             const extIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>';
+            // GLVAR Matrix has no public open-by-MLS# deep link (session-bound behind Clareity SSO),
+            // so the MLS button opens Matrix's Residential search in Scott's logged-in tab AND copies
+            // the MLS# to the clipboard so it's one paste into the single-line search box.
+            const mlsNum = (latest && latest.mls_number) ? String(latest.mls_number) : '';
+            const mlsHtml = mlsNum
+                ? `<a href="https://las.mlsmatrix.com/Matrix/Search/Residential" target="_blank" rel="noopener" class="estimate-link" title="Open GLVAR Matrix — MLS# ${mlsNum} copied to clipboard; paste into Matrix's single-line search" onclick="try{navigator.clipboard.writeText('${mlsNum}')}catch(e){}">${extIcon} MLS# ${mlsNum}</a>`
+                : '';
             const estimateHtml = `<div class="estimate-links">
                 <a href="${zillowUrl}" target="_blank" class="estimate-link">${extIcon} Zillow</a>
                 <a href="${googleUrl}" target="_blank" class="estimate-link">${extIcon} Google</a>
+                ${mlsHtml}
             </div>`;
 
             panel.innerHTML = `
@@ -4171,9 +4687,629 @@
             initDates();
             loadCoverage();
             loadData();
+            initOpenHouseDates();
+            loadOpenHouses();
+            loadShortSales();
+            loadForeclosures();
             // Delay agent queries to avoid competing with initial data load
             setTimeout(() => { loadTopAgents(); loadOpportunities(); }, 1500);
-            setTimeout(() => { loadPriceReductionTiming(); loadPreCutTargets(); loadBestValue(); }, 3000);
+            setTimeout(() => { loadPriceReductionTiming(); loadPreCutTargets(); loadBestValue(); loadClientAgents(); }, 3000);
+        }
+
+        // =====================================================================
+        // Open Houses — upcoming OHs with warm-agent intelligence
+        // =====================================================================
+        let ohRows = [];
+        let ohColSort = null;   // header-click sort; null = use the Sort dropdown
+        let ohColDir = 'asc';
+        let ohSelected = new Set();   // mls_numbers picked for the card-drop route
+        let ohLastFiltered = [];      // rows surviving the current checkbox filters
+
+        // --- Card-drop route planner -----------------------------------------
+        function ohMiles(a, b) {
+            const R = 3958.8, toR = Math.PI / 180;
+            const dLat = (b.latitude - a.latitude) * toR, dLon = (b.longitude - a.longitude) * toR;
+            const s = Math.sin(dLat / 2) ** 2 +
+                Math.cos(a.latitude * toR) * Math.cos(b.latitude * toR) * Math.sin(dLon / 2) ** 2;
+            return 2 * R * Math.asin(Math.sqrt(s));
+        }
+
+        // Nearest-neighbor stop order, starting from the northernmost stop
+        function ohNNOrder(stops) {
+            if (stops.length < 3) return stops.slice();
+            const left = stops.slice().sort((a, b) => b.latitude - a.latitude);
+            const path = [left.shift()];
+            while (left.length) {
+                const cur = path[path.length - 1];
+                let bi = 0, bd = Infinity;
+                left.forEach((r, i) => { const d = ohMiles(cur, r); if (d < bd) { bd = d; bi = i; } });
+                path.push(left.splice(bi, 1)[0]);
+            }
+            return path;
+        }
+
+        function ohAutoCluster() {
+            const n = Math.max(2, Math.min(20, parseInt(document.getElementById('ohStopN').value) || 12));
+            const cand = ohLastFiltered.filter(r => r.latitude != null && r.longitude != null);
+            if (cand.length < 2) {
+                document.getElementById('ohRouteSummary').textContent = 'Not enough mappable open houses in the current view';
+                return;
+            }
+            // Cluster within a single day (a route is one day's drive)
+            const byDate = new Map();
+            cand.forEach(r => {
+                if (!byDate.has(r.oh_date)) byDate.set(r.oh_date, []);
+                byDate.get(r.oh_date).push(r);
+            });
+            let best = null;
+            byDate.forEach(rows => {
+                if (rows.length < 2) return;
+                rows.forEach(seed => {
+                    const nearest = rows.slice()
+                        .sort((a, b) => ohMiles(seed, a) - ohMiles(seed, b))
+                        .slice(0, n);
+                    const radius = ohMiles(seed, nearest[nearest.length - 1]);
+                    if (!best || nearest.length > best.set.length ||
+                        (nearest.length === best.set.length && radius < best.radius))
+                        best = { set: nearest, radius };
+                });
+            });
+            ohSelected = new Set(best.set.map(r => r.mls_number));
+            renderOpenHouses();
+        }
+
+        function ohToggleSel(mls, tr) {
+            ohSelected.has(mls) ? ohSelected.delete(mls) : ohSelected.add(mls);
+            if (tr) tr.classList.toggle('oh-row-sel', ohSelected.has(mls));
+            ohUpdateRouteBar();
+        }
+
+        function ohClearSel() {
+            ohSelected.clear();
+            renderOpenHouses();
+        }
+
+        function ohUpdateRouteBar() {
+            const sum = document.getElementById('ohRouteSummary');
+            const clearBtn = document.getElementById('ohRouteClear');
+            const sel = ohRows.filter(r => ohSelected.has(r.mls_number));
+            if (!sel.length) {
+                sum.textContent = 'No stops selected — tick rows below or auto-pick';
+                clearBtn.style.display = 'none';
+                return;
+            }
+            clearBtn.style.display = '';
+            const mappable = sel.filter(r => r.latitude != null && r.longitude != null);
+            const unmapped = sel.filter(r => r.latitude == null || r.longitude == null);
+            const stops = ohNNOrder(mappable).concat(unmapped);
+            let miles = 0;
+            for (let i = 1; i < mappable.length; i++) miles += ohMiles(stops[i - 1], stops[i]);
+            const driveMi = miles * 1.25;   // straight-line → rough street distance
+            const dates = [...new Set(sel.map(r => r.oh_date))].sort();
+            const dayTxt = dates.length > 1
+                ? `<span style="color:var(--red)">⚠ spans ${dates.length} days</span>`
+                : ohDayLabel(dates[0]);
+            const enc = r => encodeURIComponent(
+                `${r.address}${r.unit && !r.address.includes(r.unit) ? ' #' + r.unit : ''}, ${r.city || 'Las Vegas'}, NV ${r.zip_code || ''}`.trim());
+            // Google Maps handles ~10 points per link; chain legs sharing an endpoint
+            const legs = [];
+            for (let i = 0; i < stops.length - 1; i += 9)
+                legs.push('https://www.google.com/maps/dir/' + stops.slice(i, i + 10).map(enc).join('/'));
+            const legLinks = legs.map((u, i) =>
+                `<a href="${u}" target="_blank">${legs.length > 1 ? `Leg ${i + 1}` : 'Open route in Google Maps'} ↗</a>`
+            ).join(' · ');
+            sum.innerHTML = `<strong style="color:var(--navy)">${sel.length} stops</strong> · ~${Math.round(driveMi)} mi drive · ${dayTxt} · ${legLinks}`;
+        }
+
+        function ohDateStr(d) {
+            const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'),
+                  dd = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${dd}`;
+        }
+
+        function initOpenHouseDates() {
+            const today = new Date();
+            const end = new Date(today); end.setDate(end.getDate() + 7);
+            document.getElementById('ohStart').value = ohDateStr(today);
+            document.getElementById('ohEnd').value = ohDateStr(end);
+        }
+
+        function ohPreset(kind, btn) {
+            const today = new Date();
+            let start = new Date(today), end = new Date(today);
+            if (kind === 'today') { /* start=end=today */ }
+            else if (kind === 'weekend') {
+                // upcoming Sat–Sun (if today is Sat/Sun, start today)
+                const dow = today.getDay(); // 0=Sun..6=Sat
+                if (dow === 6) { end.setDate(end.getDate() + 1); }
+                else if (dow === 0) { /* Sunday: just today */ }
+                else { start.setDate(start.getDate() + (6 - dow)); end = new Date(start); end.setDate(end.getDate() + 1); }
+            }
+            else if (kind === 'week') { end.setDate(end.getDate() + 7); }
+            else if (kind === 'twoweek') { end.setDate(end.getDate() + 14); }
+            document.getElementById('ohStart').value = ohDateStr(start);
+            document.getElementById('ohEnd').value = ohDateStr(end);
+            document.querySelectorAll('.oh-preset').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+            loadOpenHouses();
+        }
+
+        async function loadOpenHouses() {
+            const container = document.getElementById('ohContainer');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading open houses...</div>';
+            try {
+                ohRows = (await rpcWithTimeout('get_open_houses', {
+                    p_start: document.getElementById('ohStart').value,
+                    p_end: document.getElementById('ohEnd').value
+                })) || [];
+                renderOpenHouses();
+            } catch (e) {
+                container.innerHTML = `<div style="padding:20px; color:var(--red)">Open houses failed to load: ${e.message || e}</div>`;
+                document.getElementById('ohKpiGrid').innerHTML = '';
+            }
+        }
+
+        function ohFmtTime(t) {
+            if (!t) return '';
+            const [h, m] = t.split(':').map(Number);
+            const ap = h >= 12 ? 'PM' : 'AM';
+            const h12 = h % 12 === 0 ? 12 : h % 12;
+            return m ? `${h12}:${String(m).padStart(2, '0')}${ap}` : `${h12}${ap}`;
+        }
+
+        function ohDayLabel(iso) {
+            const d = new Date(iso + 'T12:00:00');
+            return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+        }
+
+        function sortOpenHousesBy(col) {
+            if (ohColSort === col) { ohColDir = ohColDir === 'asc' ? 'desc' : 'asc'; }
+            else {
+                ohColSort = col;
+                ohColDir = ['current_price', 'sqft', 'dom'].includes(col) ? 'desc' : 'asc';
+            }
+            renderOpenHouses();
+        }
+
+        function ohParsePrice(s) {
+            s = (s || '').trim().toLowerCase().replace(/[$,\s]/g, '');
+            if (!s) return null;
+            let mult = 1;
+            if (s.endsWith('k')) { mult = 1e3; s = s.slice(0, -1); }
+            else if (s.endsWith('m')) { mult = 1e6; s = s.slice(0, -1); }
+            const n = parseFloat(s);
+            return isNaN(n) ? null : n * mult;
+        }
+
+        function renderOpenHouses() {
+            const container = document.getElementById('ohContainer');
+            const warmOnly = document.getElementById('ohWarmOnly').checked;
+            const vacantOnly = document.getElementById('ohVacantOnly').checked;
+            const publicOnly = document.getElementById('ohPublicOnly').checked;
+            const priceDir = document.getElementById('ohPriceDir').value;
+            const priceAmt = ohParsePrice(document.getElementById('ohPriceAmt').value);
+            const sort = document.getElementById('ohSort').value;
+            const group = document.getElementById('ohGroup').value;
+
+            let rows = ohRows.filter(r =>
+                (!warmOnly || r.is_warm) &&
+                (!vacantOnly || (r.occupancy || '').toLowerCase().includes('vacant')) &&
+                (!publicOnly || (r.oh_type || 'Public') === 'Public') &&
+                (!priceDir || priceAmt == null ||
+                    (priceDir === 'min' ? (r.current_price || 0) >= priceAmt
+                                        : (r.current_price || 0) <= priceAmt)));
+            ohLastFiltered = rows;
+
+            // KPIs always reflect the loaded window (not the checkbox filters)
+            const warmN = ohRows.filter(r => r.is_warm).length;
+            const vacantN = ohRows.filter(r => (r.occupancy || '').toLowerCase().includes('vacant')).length;
+            const unstagedVacantN = ohRows.filter(r =>
+                (r.occupancy || '').toLowerCase().includes('vacant') && r.is_staged !== true).length;
+            document.getElementById('ohKpiGrid').innerHTML = `
+                <div class="kpi-card"><div class="kpi-label">Open Houses</div><div class="kpi-value">${ohRows.length}</div></div>
+                <div class="kpi-card"><div class="kpi-label">Warm Agents</div><div class="kpi-value" style="color:var(--gold-dark)">${warmN}</div></div>
+                <div class="kpi-card"><div class="kpi-label">Vacant</div><div class="kpi-value">${vacantN}</div></div>
+                <div class="kpi-card"><div class="kpi-label">Vacant + Unstaged</div><div class="kpi-value" style="color:var(--navy)">${unstagedVacantN}</div></div>`;
+
+            const cmpDate = (a, b) => (a.oh_date || '').localeCompare(b.oh_date || '')
+                || (a.oh_start || '').localeCompare(b.oh_start || '');
+            const sorters = {
+                date: cmpDate,
+                warm: (a, b) => (b.is_warm - a.is_warm) || cmpDate(a, b),
+                address: (a, b) => (a.address || '').localeCompare(b.address || ''),
+                zip: (a, b) => (a.zip_code || '').localeCompare(b.zip_code || '') || cmpDate(a, b),
+                subdivision: (a, b) => (a.subdivision || 'zzz').localeCompare(b.subdivision || 'zzz') || cmpDate(a, b),
+                agent: (a, b) => (a.list_agent_name || 'zzz').localeCompare(b.list_agent_name || 'zzz') || cmpDate(a, b),
+                price: (a, b) => (b.current_price || 0) - (a.current_price || 0),
+            };
+            if (ohColSort) {
+                const dir = ohColDir === 'asc' ? 1 : -1;
+                const numeric = ['current_price', 'sqft', 'dom', 'beds'].includes(ohColSort);
+                rows.sort((a, b) => {
+                    if (ohColSort === 'when') return cmpDate(a, b) * dir;
+                    let va = a[ohColSort], vb = b[ohColSort];
+                    if (ohColSort === 'beds' && va === vb) { va = a.baths; vb = b.baths; }
+                    if (va == null || va === '') return 1;
+                    if (vb == null || vb === '') return -1;
+                    const cmp = numeric ? Number(va) - Number(vb)
+                                        : String(va).localeCompare(String(vb));
+                    return cmp * dir || cmpDate(a, b);
+                });
+            } else {
+                rows.sort(sorters[sort] || cmpDate);
+            }
+
+            if (!rows.length) {
+                container.innerHTML = '<div style="padding:20px; color:var(--gray-400); text-align:center">No open houses match</div>';
+                ohUpdateRouteBar();
+                return;
+            }
+
+            const rowHtml = r => {
+                const badges = [];
+                if (r.is_warm) {
+                    const tip = `${r.warm_reasons || 'contact'} · last contact ${fmtDate(r.warm_last_contact) || '—'} · ${r.warm_event_count || 1} event(s)`;
+                    badges.push(`<span class="oh-badge oh-badge-warm" title="${tip}">WARM</span>`);
+                }
+                if ((r.occupancy || '').toLowerCase().includes('vacant'))
+                    badges.push('<span class="oh-badge oh-badge-vacant">VACANT</span>');
+                if (r.staged_by === 'COMPETITOR')
+                    badges.push('<span class="oh-badge oh-badge-staged" title="Competitor-staged — never pitch staging on this listing">STAGED ⚠</span>');
+                else if (r.staged_by === 'UHS')
+                    badges.push('<span class="oh-badge oh-badge-warm" title="Staged by UHS">UHS</span>');
+                const typeTxt = r.oh_type || 'Public';
+                const addr = r.address + (r.unit && !r.address.includes(r.unit) ? ' #' + r.unit : '');
+                const agentBits = [r.list_agent_name || '—'];
+                if (r.list_agent_phone) agentBits.push(r.list_agent_phone);
+                const selected = ohSelected.has(r.mls_number);
+                return `
+                <tr class="${r.is_warm ? 'oh-row-warm' : ''}${selected ? ' oh-row-sel' : ''}">
+                    <td style="width:28px"><input type="checkbox" ${selected ? 'checked' : ''}
+                        onchange="ohToggleSel('${r.mls_number}', this.closest('tr'))"></td>
+                    <td style="text-align:left; white-space:nowrap">${ohDayLabel(r.oh_date)}<br>
+                        <span style="color:var(--gray-500)">${ohFmtTime(r.oh_start)}–${ohFmtTime(r.oh_end)}</span>
+                        <span class="oh-badge oh-badge-type">${typeTxt}</span></td>
+                    <td style="text-align:left"><a class="redfin-link" href="${zillowUrl(r.address, r.city)}" target="_blank">${addr}</a> ${badges.join(' ')}</td>
+                    <td><a class="mls-link" href="https://www.google.com/search?q=MLS+${r.mls_number}+Las+Vegas+NV" target="_blank">${r.mls_number}</a></td>
+                    <td>${r.zip_code || '—'}</td>
+                    <td style="text-align:left">${r.subdivision || '—'}</td>
+                    <td>${fmtPrice(r.current_price)}</td>
+                    <td>${r.beds || '—'}/${r.baths || '—'}</td>
+                    <td>${fmtN(r.sqft)}</td>
+                    <td>${r.dom != null ? r.dom : '—'}</td>
+                    <td style="text-align:left" title="${r.list_agent_email || ''}">${agentBits.join('<br>')}</td>
+                    <td style="text-align:left">${r.list_office_name || '—'}</td>
+                </tr>`;
+            };
+
+            const ohHdr = (label, col, align) => {
+                const arrow = ohColSort === col ? (ohColDir === 'asc' ? ' ▲' : ' ▼') : '';
+                const style = align ? `text-align:${align};` : '';
+                return `<th style="${style}cursor:pointer;user-select:none" onclick="sortOpenHousesBy('${col}')">${label}${arrow}</th>`;
+            };
+            const header = `
+                <thead><tr>
+                    <th style="width:28px"></th>
+                    ${ohHdr('When', 'when', 'left')}${ohHdr('Address', 'address', 'left')}${ohHdr('MLS#', 'mls_number')}
+                    ${ohHdr('ZIP', 'zip_code')}${ohHdr('Neighborhood', 'subdivision', 'left')}${ohHdr('Price', 'current_price')}${ohHdr('Bd/Ba', 'beds')}
+                    ${ohHdr('SqFt', 'sqft')}${ohHdr('DOM', 'dom')}${ohHdr('Listing Agent', 'list_agent_name', 'left')}${ohHdr('Office', 'list_office_name', 'left')}
+                </tr></thead>`;
+
+            let bodyHtml = '';
+            if (group === 'none') {
+                bodyHtml = `<tbody>${rows.map(rowHtml).join('')}</tbody>`;
+            } else {
+                const keyFn = group === 'day' ? (r => r.oh_date) : (r => r.zip_code || '—');
+                const labelFn = group === 'day'
+                    ? (k, n) => `${ohDayLabel(k)} — ${n} open house${n === 1 ? '' : 's'}`
+                    : (k, n) => `ZIP ${k} — ${n} open house${n === 1 ? '' : 's'}`;
+                const groupsMap = new Map();
+                rows.forEach(r => {
+                    const k = keyFn(r);
+                    if (!groupsMap.has(k)) groupsMap.set(k, []);
+                    groupsMap.get(k).push(r);
+                });
+                bodyHtml = [...groupsMap.entries()].sort((a, b) => String(a[0]).localeCompare(String(b[0]))).map(([k, rs]) =>
+                    `<tbody><tr><td colspan="12" class="oh-day-header">${labelFn(k, rs.length)}</td></tr>${rs.map(rowHtml).join('')}</tbody>`
+                ).join('');
+            }
+
+            container.innerHTML = `<div class="oh-scroll"><table>${header}${bodyHtml}</table></div>
+                <div style="margin-top:8px; color:var(--gray-400); font-size:12px">
+                    ${rows.length} of ${ohRows.length} open houses shown · gold rows = warm listing agent ·
+                    STAGED ⚠ = competitor-staged, excluded from outreach</div>`;
+            ohUpdateRouteBar();
+        }
+
+        // =====================================================================
+        // Short Sales — Active
+        // =====================================================================
+        let ssRows = [];
+        let ssColSort = null;
+        let ssColDir = 'desc';
+
+        async function loadShortSales() {
+            const container = document.getElementById('ssContainer');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading short sales...</div>';
+            try {
+                ssRows = (await rpcWithTimeout('get_short_sales', {}, 20000)) || [];
+                renderShortSales();
+            } catch (e) {
+                container.innerHTML = `<div style="padding:20px; color:var(--red)">Short sales failed to load: ${e.message || e}</div>`;
+                document.getElementById('ssKpiGrid').innerHTML = '';
+            }
+        }
+
+        function sortShortSalesBy(col) {
+            if (ssColSort === col) { ssColDir = ssColDir === 'asc' ? 'desc' : 'asc'; }
+            else {
+                ssColSort = col;
+                ssColDir = ['current_price', 'sqft', 'dom', 'beds'].includes(col) ? 'desc' : 'asc';
+            }
+            renderShortSales();
+        }
+
+        function renderShortSales() {
+            const container = document.getElementById('ssContainer');
+            const warmOnly = document.getElementById('ssWarmOnly').checked;
+            const vacantOnly = document.getElementById('ssVacantOnly').checked;
+            const unstagedOnly = document.getElementById('ssUnstagedOnly').checked;
+            const sort = document.getElementById('ssSort').value;
+
+            let rows = ssRows.filter(r =>
+                (!warmOnly || r.is_warm) &&
+                (!vacantOnly || (r.occupancy || '').toLowerCase().includes('vacant')) &&
+                (!unstagedOnly || r.is_staged !== true));
+
+            // KPIs reflect all loaded rows (not filtered)
+            const warmN = ssRows.filter(r => r.is_warm).length;
+            const vacantN = ssRows.filter(r => (r.occupancy || '').toLowerCase().includes('vacant')).length;
+            const prices = ssRows.map(r => r.current_price).filter(Boolean).sort((a, b) => a - b);
+            const medianPrice = prices.length ? prices[Math.floor(prices.length / 2)] : 0;
+            document.getElementById('ssKpiGrid').innerHTML = `
+                <div class="kpi-card"><div class="kpi-label">Active Short Sales</div><div class="kpi-value">${ssRows.length}</div></div>
+                <div class="kpi-card"><div class="kpi-label">Median Price</div><div class="kpi-value">$${(medianPrice/1000).toFixed(0)}K</div></div>
+                <div class="kpi-card"><div class="kpi-label">Warm Agents</div><div class="kpi-value" style="color:var(--gold-dark)">${warmN}</div></div>
+                <div class="kpi-card"><div class="kpi-label">Vacant</div><div class="kpi-value">${vacantN}</div></div>`;
+
+            const sorters = {
+                dom: (a, b) => (b.dom || 0) - (a.dom || 0),
+                warm: (a, b) => (b.is_warm - a.is_warm) || (b.dom || 0) - (a.dom || 0),
+                price: (a, b) => (b.current_price || 0) - (a.current_price || 0),
+                address: (a, b) => (a.address || '').localeCompare(b.address || ''),
+                zip: (a, b) => (a.zip_code || '').localeCompare(b.zip_code || ''),
+                subdivision: (a, b) => (a.subdivision || 'zzz').localeCompare(b.subdivision || 'zzz'),
+                agent: (a, b) => (a.list_agent_name || 'zzz').localeCompare(b.list_agent_name || 'zzz'),
+            };
+            if (ssColSort) {
+                const dir = ssColDir === 'asc' ? 1 : -1;
+                const numeric = ['current_price', 'original_list_price', 'sqft', 'dom', 'beds'].includes(ssColSort);
+                rows.sort((a, b) => {
+                    let va = a[ssColSort], vb = b[ssColSort];
+                    if (va == null || va === '') return 1;
+                    if (vb == null || vb === '') return -1;
+                    const cmp = numeric ? Number(va) - Number(vb) : String(va).localeCompare(String(vb));
+                    return cmp * dir;
+                });
+            } else {
+                rows.sort(sorters[sort] || sorters.dom);
+            }
+
+            if (!rows.length) {
+                container.innerHTML = '<div style="padding:20px; color:var(--gray-400); text-align:center">No short sales match</div>';
+                return;
+            }
+
+            const colHdr = (col, label) => {
+                const arrow = ssColSort === col ? (ssColDir === 'asc' ? ' ↑' : ' ↓') : '';
+                return `<th onclick="sortShortSalesBy('${col}')" style="cursor:pointer">${label}${arrow}</th>`;
+            };
+            const header = `<thead><tr>
+                ${colHdr('address','Address')}
+                ${colHdr('mls_number','MLS #')}
+                ${colHdr('status','Status')}
+                ${colHdr('zip_code','ZIP')}
+                ${colHdr('subdivision','Neighborhood')}
+                ${colHdr('beds','Bd/Ba')}
+                ${colHdr('sqft','Sqft')}
+                ${colHdr('current_price','Price')}
+                ${colHdr('original_list_price','Orig Price')}
+                ${colHdr('dom','DOM')}
+                ${colHdr('occupancy','Occupancy')}
+                ${colHdr('list_agent_name','Agent')}
+                <th>Flags</th>
+            </tr></thead>`;
+
+            const bodyHtml = '<tbody>' + rows.map(r => {
+                const badges = [];
+                if (r.is_warm) {
+                    const tip = `${r.warm_reasons || 'contact'} · last contact ${fmtDate(r.warm_last_contact) || '—'} · ${r.warm_event_count || 1} event(s)`;
+                    badges.push(`<span class="oh-badge oh-badge-warm" title="${tip}">WARM</span>`);
+                }
+                if ((r.occupancy || '').toLowerCase().includes('vacant'))
+                    badges.push('<span class="oh-badge oh-badge-vacant">VACANT</span>');
+                if (r.staged_by === 'COMPETITOR')
+                    badges.push('<span class="oh-badge oh-badge-staged" title="Competitor-staged">STAGED ⚠</span>');
+                else if (r.staged_by === 'UHS')
+                    badges.push('<span class="oh-badge oh-badge-warm" title="Staged by UHS">UHS</span>');
+                const addr = r.address + (r.unit && !r.address.includes(r.unit) ? ' #' + r.unit : '');
+                const pctChg = r.original_list_price && r.current_price && r.original_list_price !== r.current_price
+                    ? (1 - r.current_price/r.original_list_price)*100 : 0;
+                const priceDrop = pctChg > 0
+                    ? `<span style="color:var(--red);font-size:11px"> ▼${pctChg.toFixed(1)}%</span>`
+                    : pctChg < 0
+                    ? `<span style="color:var(--green, #15803d);font-size:11px"> ▲${(-pctChg).toFixed(1)}%</span>` : '';
+                const domColor = (r.dom || 0) > 90 ? 'var(--red)' : (r.dom || 0) > 45 ? 'var(--gold-dark)' : 'inherit';
+                return `<tr class="${r.is_warm ? 'oh-row-warm' : ''}">
+                    <td style="text-align:left;white-space:nowrap">${addr}</td>
+                    <td style="white-space:nowrap;font-size:12px;color:var(--gray-500)">${r.mls_number || '—'}</td>
+                    <td style="white-space:nowrap" title="${r.status === 'A-ER' ? 'Active — Exclusive Right' : r.status === 'A-EA' ? 'Active — Exclusive Agency' : ''}">${r.status || '—'}</td>
+                    <td>${r.zip_code || '—'}</td>
+                    <td style="text-align:left">${r.subdivision || '—'}</td>
+                    <td style="white-space:nowrap">${r.beds || '—'}/${r.baths || '—'}</td>
+                    <td>${r.sqft ? Number(r.sqft).toLocaleString() : '—'}</td>
+                    <td style="white-space:nowrap">$${r.current_price ? Number(r.current_price).toLocaleString() : '—'}${priceDrop}</td>
+                    <td>$${r.original_list_price ? Number(r.original_list_price).toLocaleString() : '—'}</td>
+                    <td style="color:${domColor};font-weight:${(r.dom||0)>90?'700':'400'}">${r.dom ?? '—'}</td>
+                    <td>${r.occupancy || '—'}</td>
+                    <td style="text-align:left;white-space:nowrap">${r.list_agent_name || '—'}${r.list_agent_phone ? `<br><span style="color:var(--gray-500);font-size:11px">${r.list_agent_phone}</span>` : ''}</td>
+                    <td style="white-space:nowrap">${badges.join(' ')}</td>
+                </tr>`;
+            }).join('') + '</tbody>';
+
+            container.innerHTML = `<div class="oh-scroll"><table>${header}${bodyHtml}</table></div>
+                <div style="margin-top:8px; color:var(--gray-400); font-size:12px">
+                    ${rows.length} of ${ssRows.length} active short sales · gold rows = warm listing agent · DOM colored red &gt;90d, gold &gt;45d</div>`;
+        }
+
+        // =====================================================================
+        // Foreclosures & REO — Active
+        // =====================================================================
+        let fcRows = [];
+        let fcColSort = null;
+        let fcColDir = 'desc';
+
+        async function loadForeclosures() {
+            const container = document.getElementById('fcContainer');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading foreclosures...</div>';
+            try {
+                fcRows = (await rpcWithTimeout('get_foreclosures', {}, 20000)) || [];
+                renderForeclosures();
+            } catch (e) {
+                container.innerHTML = `<div style="padding:20px; color:var(--red)">Foreclosures failed to load: ${e.message || e}</div>`;
+                document.getElementById('fcKpiGrid').innerHTML = '';
+            }
+        }
+
+        function sortForeclosuresBy(col) {
+            if (fcColSort === col) { fcColDir = fcColDir === 'asc' ? 'desc' : 'asc'; }
+            else {
+                fcColSort = col;
+                fcColDir = ['current_price', 'sqft', 'dom', 'beds'].includes(col) ? 'desc' : 'asc';
+            }
+            renderForeclosures();
+        }
+
+        function renderForeclosures() {
+            const container = document.getElementById('fcContainer');
+            const warmOnly = document.getElementById('fcWarmOnly').checked;
+            const vacantOnly = document.getElementById('fcVacantOnly').checked;
+            const unstagedOnly = document.getElementById('fcUnstagedOnly').checked;
+            const reoOnly = document.getElementById('fcReoOnly').checked;
+            const sort = document.getElementById('fcSort').value;
+
+            let rows = fcRows.filter(r =>
+                (!warmOnly || r.is_warm) &&
+                (!vacantOnly || (r.occupancy || '').toLowerCase().includes('vacant')) &&
+                (!unstagedOnly || r.is_staged !== true) &&
+                (!reoOnly || r.reo));
+
+            // KPIs reflect all loaded rows (not filtered)
+            const reoN = fcRows.filter(r => r.reo).length;
+            const warmN = fcRows.filter(r => r.is_warm).length;
+            const vacantN = fcRows.filter(r => (r.occupancy || '').toLowerCase().includes('vacant')).length;
+            const prices = fcRows.map(r => r.current_price).filter(Boolean).sort((a, b) => a - b);
+            const medianPrice = prices.length ? prices[Math.floor(prices.length / 2)] : 0;
+            document.getElementById('fcKpiGrid').innerHTML = `
+                <div class="kpi-card"><div class="kpi-label">Active Foreclosures/REO</div><div class="kpi-value">${fcRows.length}</div></div>
+                <div class="kpi-card"><div class="kpi-label">Bank-Owned (REO)</div><div class="kpi-value">${reoN}</div></div>
+                <div class="kpi-card"><div class="kpi-label">Median Price</div><div class="kpi-value">$${(medianPrice/1000).toFixed(0)}K</div></div>
+                <div class="kpi-card"><div class="kpi-label">Warm Agents</div><div class="kpi-value" style="color:var(--gold-dark)">${warmN}</div></div>
+                <div class="kpi-card"><div class="kpi-label">Vacant</div><div class="kpi-value">${vacantN}</div></div>`;
+
+            const sorters = {
+                dom: (a, b) => (b.dom || 0) - (a.dom || 0),
+                warm: (a, b) => (b.is_warm - a.is_warm) || (b.dom || 0) - (a.dom || 0),
+                price: (a, b) => (b.current_price || 0) - (a.current_price || 0),
+                address: (a, b) => (a.address || '').localeCompare(b.address || ''),
+                zip: (a, b) => (a.zip_code || '').localeCompare(b.zip_code || ''),
+                subdivision: (a, b) => (a.subdivision || 'zzz').localeCompare(b.subdivision || 'zzz'),
+                agent: (a, b) => (a.list_agent_name || 'zzz').localeCompare(b.list_agent_name || 'zzz'),
+            };
+            if (fcColSort) {
+                const dir = fcColDir === 'asc' ? 1 : -1;
+                const numeric = ['current_price', 'original_list_price', 'sqft', 'dom', 'beds'].includes(fcColSort);
+                rows.sort((a, b) => {
+                    let va = a[fcColSort], vb = b[fcColSort];
+                    if (va == null || va === '') return 1;
+                    if (vb == null || vb === '') return -1;
+                    const cmp = numeric ? Number(va) - Number(vb) : String(va).localeCompare(String(vb));
+                    return cmp * dir;
+                });
+            } else {
+                rows.sort(sorters[sort] || sorters.dom);
+            }
+
+            if (!rows.length) {
+                container.innerHTML = '<div style="padding:20px; color:var(--gray-400); text-align:center">No foreclosures match</div>';
+                return;
+            }
+
+            const colHdr = (col, label) => {
+                const arrow = fcColSort === col ? (fcColDir === 'asc' ? ' ↑' : ' ↓') : '';
+                return `<th onclick="sortForeclosuresBy('${col}')" style="cursor:pointer">${label}${arrow}</th>`;
+            };
+            const header = `<thead><tr>
+                ${colHdr('address','Address')}
+                ${colHdr('mls_number','MLS #')}
+                ${colHdr('status','Status')}
+                ${colHdr('reo','Type')}
+                ${colHdr('zip_code','ZIP')}
+                ${colHdr('subdivision','Neighborhood')}
+                ${colHdr('beds','Bd/Ba')}
+                ${colHdr('sqft','Sqft')}
+                ${colHdr('current_price','Price')}
+                ${colHdr('original_list_price','Orig Price')}
+                ${colHdr('dom','DOM')}
+                ${colHdr('occupancy','Occupancy')}
+                ${colHdr('list_agent_name','Agent')}
+                <th>Flags</th>
+            </tr></thead>`;
+
+            const bodyHtml = '<tbody>' + rows.map(r => {
+                const badges = [];
+                if (r.is_warm) {
+                    const tip = `${r.warm_reasons || 'contact'} · last contact ${fmtDate(r.warm_last_contact) || '—'} · ${r.warm_event_count || 1} event(s)`;
+                    badges.push(`<span class="oh-badge oh-badge-warm" title="${tip}">WARM</span>`);
+                }
+                if ((r.occupancy || '').toLowerCase().includes('vacant'))
+                    badges.push('<span class="oh-badge oh-badge-vacant">VACANT</span>');
+                if (r.staged_by === 'COMPETITOR')
+                    badges.push('<span class="oh-badge oh-badge-staged" title="Competitor-staged">STAGED ⚠</span>');
+                else if (r.staged_by === 'UHS')
+                    badges.push('<span class="oh-badge oh-badge-warm" title="Staged by UHS">UHS</span>');
+                const typeBadge = r.reo
+                    ? '<span class="oh-badge oh-badge-staged" title="Bank-owned (real-estate owned)">REO</span>'
+                    : '<span class="oh-badge oh-badge-vacant" title="In foreclosure">FCL</span>';
+                const addr = r.address + (r.unit && !r.address.includes(r.unit) ? ' #' + r.unit : '');
+                const pctChg = r.original_list_price && r.current_price && r.original_list_price !== r.current_price
+                    ? (1 - r.current_price/r.original_list_price)*100 : 0;
+                const priceDrop = pctChg > 0
+                    ? `<span style="color:var(--red);font-size:11px"> ▼${pctChg.toFixed(1)}%</span>`
+                    : pctChg < 0
+                    ? `<span style="color:var(--green, #15803d);font-size:11px"> ▲${(-pctChg).toFixed(1)}%</span>` : '';
+                const domColor = (r.dom || 0) > 90 ? 'var(--red)' : (r.dom || 0) > 45 ? 'var(--gold-dark)' : 'inherit';
+                return `<tr class="${r.is_warm ? 'oh-row-warm' : ''}">
+                    <td style="text-align:left;white-space:nowrap">${addr}</td>
+                    <td style="white-space:nowrap;font-size:12px;color:var(--gray-500)">${r.mls_number || '—'}</td>
+                    <td style="white-space:nowrap" title="${r.status === 'A-ER' ? 'Active — Exclusive Right' : r.status === 'A-EA' ? 'Active — Exclusive Agency' : r.status === 'A-AU' ? 'Active — Auction' : ''}">${r.status || '—'}</td>
+                    <td style="white-space:nowrap">${typeBadge}</td>
+                    <td>${r.zip_code || '—'}</td>
+                    <td style="text-align:left">${r.subdivision || '—'}</td>
+                    <td style="white-space:nowrap">${r.beds || '—'}/${r.baths || '—'}</td>
+                    <td>${r.sqft ? Number(r.sqft).toLocaleString() : '—'}</td>
+                    <td style="white-space:nowrap">$${r.current_price ? Number(r.current_price).toLocaleString() : '—'}${priceDrop}</td>
+                    <td>$${r.original_list_price ? Number(r.original_list_price).toLocaleString() : '—'}</td>
+                    <td style="color:${domColor};font-weight:${(r.dom||0)>90?'700':'400'}">${r.dom ?? '—'}</td>
+                    <td>${r.occupancy || '—'}</td>
+                    <td style="text-align:left;white-space:nowrap">${r.list_agent_name || '—'}${r.list_agent_phone ? `<br><span style="color:var(--gray-500);font-size:11px">${r.list_agent_phone}</span>` : ''}</td>
+                    <td style="white-space:nowrap">${badges.join(' ')}</td>
+                </tr>`;
+            }).join('') + '</tbody>';
+
+            container.innerHTML = `<div class="oh-scroll"><table>${header}${bodyHtml}</table></div>
+                <div style="margin-top:8px; color:var(--gray-400); font-size:12px">
+                    ${rows.length} of ${fcRows.length} active foreclosures/REO · REO = bank-owned, FCL = in foreclosure · gold rows = warm listing agent · DOM colored red &gt;90d, gold &gt;45d</div>`;
         }
 
         // =====================================================================
@@ -4455,6 +5591,31 @@
         let bvData = [];
         let bvPage = 0;
         const bvPageSize = 25;
+        // Header-click column sort — overrides the bvSort dropdown when set.
+        let bvSortCol = null;
+        let bvSortDir = 'desc';
+        const bvColAccessors = {
+            area:  d => String(d.area_label || d.subdivision || '').toLowerCase(),
+            sqft:  d => Number(d.sqft) || 0,
+            list:  d => Number(d.list_price) || 0,
+            ppsf:  d => Number(d.subj_ppsf) || 0,
+            comp:  d => Number(d.comp_med_ppsf) || 0,
+            disc:  d => Number(d.discount_pct) || 0,
+            gap:   d => Number(d.dollar_gap) || 0,
+            comps: d => Number(d.n_comps) || 0,
+            dom:   d => Number(d.dom) || 0,
+        };
+        function bvSortBy(col) {
+            if (!bvColAccessors[col]) return;
+            if (bvSortCol === col) { bvSortDir = bvSortDir === 'asc' ? 'desc' : 'asc'; }
+            else { bvSortCol = col; bvSortDir = (col === 'area') ? 'asc' : 'desc'; }
+            bvPage = 0;
+            renderBestValue();
+        }
+        // Sort-direction caret for the active column header.
+        function bvInd(col) {
+            return bvSortCol === col ? (bvSortDir === 'asc' ? ' ▲' : ' ▼') : '';
+        }
 
         async function loadBestValue(page) {
             if (page !== undefined) { bvPage = page; renderBestValue(); return; }
@@ -4488,13 +5649,25 @@
                 container.innerHTML = '<div style="color:#94a3b8;padding:12px">No listings match these filters. Try widening the discount or price range.</div>';
                 return;
             }
-            const sortKey = document.getElementById('bvSort').value;
-            const sorted = bvData.slice().sort((a, b) => {
-                if (sortKey === 'gap')   return Number(b.dollar_gap) - Number(a.dollar_gap);
-                if (sortKey === 'dom')   return Number(b.dom) - Number(a.dom);
-                if (sortKey === 'price') return Number(a.list_price) - Number(b.list_price);
-                return Number(b.discount_pct) - Number(a.discount_pct);
-            });
+            let sorted;
+            if (bvSortCol && bvColAccessors[bvSortCol]) {
+                const f = bvColAccessors[bvSortCol];
+                const dir = bvSortDir === 'asc' ? 1 : -1;
+                sorted = bvData.slice().sort((a, b) => {
+                    const av = f(a), bv = f(b);
+                    if (av < bv) return -1 * dir;
+                    if (av > bv) return 1 * dir;
+                    return 0;
+                });
+            } else {
+                const sortKey = document.getElementById('bvSort').value;
+                sorted = bvData.slice().sort((a, b) => {
+                    if (sortKey === 'gap')   return Number(b.dollar_gap) - Number(a.dollar_gap);
+                    if (sortKey === 'dom')   return Number(b.dom) - Number(a.dom);
+                    if (sortKey === 'price') return Number(a.list_price) - Number(b.list_price);
+                    return Number(b.discount_pct) - Number(a.discount_pct);
+                });
+            }
             const total = sorted.length;
             const start = bvPage * bvPageSize;
             const end = Math.min(start + bvPageSize, total);
@@ -4530,16 +5703,16 @@
                 <div style="overflow-x:auto">
                 <table>
                     <thead><tr>
-                        <th>Area</th><th>Type</th>
+                        <th onclick="bvSortBy('area')" style="cursor:pointer;user-select:none" title="Sort by Area">Area${bvInd('area')}</th><th>Type</th>
                         <th style="text-align:center">Bd/Ba</th>
-                        <th style="text-align:right">SqFt</th>
-                        <th style="text-align:right">List $</th>
-                        <th style="text-align:right">$/SqFt</th>
-                        <th style="text-align:right">Comp $/SqFt</th>
-                        <th style="text-align:right">Disc %</th>
-                        <th style="text-align:right">$ Gap</th>
-                        <th style="text-align:center">Comps</th>
-                        <th style="text-align:center">DOM</th>
+                        <th onclick="bvSortBy('sqft')" style="text-align:right;cursor:pointer;user-select:none" title="Sort by SqFt">SqFt${bvInd('sqft')}</th>
+                        <th onclick="bvSortBy('list')" style="text-align:right;cursor:pointer;user-select:none" title="Sort by List $">List $${bvInd('list')}</th>
+                        <th onclick="bvSortBy('ppsf')" style="text-align:right;cursor:pointer;user-select:none" title="Sort by $/SqFt">$/SqFt${bvInd('ppsf')}</th>
+                        <th onclick="bvSortBy('comp')" style="text-align:right;cursor:pointer;user-select:none" title="Sort by Comp $/SqFt">Comp $/SqFt${bvInd('comp')}</th>
+                        <th onclick="bvSortBy('disc')" style="text-align:right;cursor:pointer;user-select:none" title="Sort by Disc %">Disc %${bvInd('disc')}</th>
+                        <th onclick="bvSortBy('gap')" style="text-align:right;cursor:pointer;user-select:none" title="Sort by $ Gap">$ Gap${bvInd('gap')}</th>
+                        <th onclick="bvSortBy('comps')" style="text-align:center;cursor:pointer;user-select:none" title="Sort by Comps">Comps${bvInd('comps')}</th>
+                        <th onclick="bvSortBy('dom')" style="text-align:center;cursor:pointer;user-select:none" title="Sort by DOM">DOM${bvInd('dom')}</th>
                         <th>Ref</th>
                     </tr></thead>
                     <tbody>${rows}</tbody>
@@ -4589,6 +5762,153 @@
             }
         }
 
+        // =====================================================================
+        // Client Agents — previous clients & inquiries vs. their MLS listings
+        // Data: get_client_agent_grid RPC (mv_client_agent_grid, nightly refresh)
+        // =====================================================================
+        let caRows = [];
+        let caSortCol = 'active_count';
+        let caSortDir = 'desc';
+        let caShowAll = false;
+        let caOpen = new Set();   // canon_keys with expanded struggling drill-down
+
+        async function loadClientAgents() {
+            const container = document.getElementById('clientAgentsContainer');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading client agents...</div>';
+            try {
+                const rel = document.getElementById('caRelationship').value;
+                const data = await rpcWithTimeout('get_client_agent_grid', { p_relationship: rel }, 30000);
+                caRows = data || [];
+                caShowAll = false;
+                caOpen = new Set();
+                renderClientAgents();
+            } catch (err) {
+                container.innerHTML = `<div style="color:#ef4444; padding:12px">Failed to load client agents: ${err.message}</div>`;
+            }
+        }
+
+        function caSortData(rows) {
+            const col = caSortCol;
+            const dir = caSortDir === 'asc' ? 1 : -1;
+            const numeric = ['projects_count','proposals_count','active_count','total_count','sold_count','struggling_count'].includes(col);
+            rows.sort((a, b) => {
+                let va = a[col], vb = b[col];
+                if (va == null) return 1; if (vb == null) return -1;
+                if (numeric) return (Number(va) - Number(vb)) * dir;
+                return String(va).localeCompare(String(vb)) * dir;
+            });
+        }
+
+        function sortClientAgents(col) {
+            if (caSortCol === col) { caSortDir = caSortDir === 'asc' ? 'desc' : 'asc'; }
+            else { caSortCol = col; caSortDir = ['agent_name','relationship'].includes(col) ? 'asc' : 'desc'; }
+            renderClientAgents();
+        }
+
+        function caToggleShowAll() { caShowAll = !caShowAll; renderClientAgents(); }
+
+        function caToggleRow(key) {
+            if (caOpen.has(key)) caOpen.delete(key); else caOpen.add(key);
+            renderClientAgents();
+        }
+
+        // Deep-link into Agent Intelligence (needs the exact MLS-side name)
+        function caOpenAgent(name) {
+            if (!name) return;
+            document.getElementById('agentSearch').value = name;
+            searchAgentByName(name);
+            document.getElementById('agentListingsCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function renderClientAgents() {
+            const container = document.getElementById('clientAgentsContainer');
+            const activeOnly = document.getElementById('caActiveOnly').checked;
+            let rows = activeOnly ? caRows.filter(r => r.active_count > 0) : caRows.slice();
+            caSortData(rows);
+
+            const total = rows.length;
+            const shown = caShowAll ? rows : rows.slice(0, 20);
+            document.getElementById('caCount').textContent =
+                `${shown.length} of ${total} agents · ${caRows.length} client agents total`;
+
+            if (!total) {
+                container.innerHTML = '<div style="color:#94a3b8; padding:12px">No client agents match this filter.</div>';
+                return;
+            }
+
+            const hdr = (label, col, align) => {
+                const arrow = caSortCol === col ? (caSortDir === 'asc' ? ' ▲' : ' ▼') : '';
+                const style = align ? `text-align:${align};` : '';
+                return `<th style="${style}cursor:pointer;user-select:none" onclick="sortClientAgents('${col}')">${label}${arrow}</th>`;
+            };
+            const header = `<thead><tr>
+                ${hdr('Agent', 'agent_name', 'left')}
+                ${hdr('Relationship', 'relationship', 'left')}
+                ${hdr('Projects', 'projects_count')}
+                ${hdr('Inquiries', 'proposals_count')}
+                ${hdr('Last Contact', 'last_contact_date')}
+                ${hdr('Active', 'active_count')}
+                ${hdr('Total Listings', 'total_count')}
+                ${hdr('Sold', 'sold_count')}
+                ${hdr('Struggling', 'struggling_count')}
+            </tr></thead>`;
+
+            const relBadge = (rel) => {
+                const colors = { 'Client': '#22c55e', 'Both': '#eab308', 'Inquiry': '#94a3b8' };
+                const label = rel === 'Both' ? 'Client + Inquiry' : rel;
+                return `<span style="color:${colors[rel] || '#94a3b8'}; font-weight:600">${label}</span>`;
+            };
+
+            const body = shown.map(r => {
+                const key = r.canon_key.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                const mlsName = (r.mls_agent_name || '').replace(/'/g, "\\'");
+                const agentCell = r.mls_agent_name
+                    ? `<a href="javascript:void(0)" onclick="caOpenAgent('${mlsName}')" style="color:var(--gold); text-decoration:none; font-weight:600">${r.agent_name}</a>`
+                    : `<span title="No MLS listings found for this contact">${r.agent_name}</span>`;
+                const strugCell = r.struggling_count > 0
+                    ? `<a href="javascript:void(0)" onclick="caToggleRow('${key}')" style="color:#ef4444; font-weight:600; text-decoration:none">${r.struggling_count} ${caOpen.has(r.canon_key) ? '▾' : '▸'}</a>`
+                    : '<span style="color:#334155">0</span>';
+                let html = `<tr>
+                    <td style="text-align:left">${agentCell}</td>
+                    <td style="text-align:left">${relBadge(r.relationship)}</td>
+                    <td>${r.projects_count || '—'}</td>
+                    <td>${r.proposals_count || '—'}</td>
+                    <td style="white-space:nowrap">${r.last_contact_date || '—'}</td>
+                    <td style="font-weight:600">${r.active_count || '—'}</td>
+                    <td>${fmtN(r.total_count)}</td>
+                    <td>${fmtN(r.sold_count)}</td>
+                    <td>${strugCell}</td>
+                </tr>`;
+                if (caOpen.has(r.canon_key) && Array.isArray(r.struggling) && r.struggling.length) {
+                    const items = r.struggling.map(s => {
+                        const domStyle = (s.dom || 0) >= 60 ? 'color:#ef4444; font-weight:600' : 'color:#e2e8f0';
+                        const cut = s.cut_pct > 0
+                            ? `<span style="color:${s.cut_pct >= 10 ? '#ef4444' : '#f97316'}; font-weight:600">−${s.cut_pct}%</span>`
+                            : '<span style="color:#334155">full price</span>';
+                        return `<div onclick="caOpenAgent('${mlsName}')" style="display:flex; gap:14px; align-items:baseline; padding:4px 8px; cursor:pointer; border-radius:4px" onmouseover="this.style.background='#1e293b'" onmouseout="this.style.background=''">
+                            <span style="min-width:70px; color:#94a3b8; font-size:12px">${s.mls_number}</span>
+                            <span style="flex:1; text-align:left; color:#e2e8f0">${s.address || '—'}${s.city ? ', ' + s.city : ''}</span>
+                            <span style="min-width:90px; text-align:right; color:#e2e8f0">${fmtPrice(s.price)}</span>
+                            <span style="min-width:70px; text-align:right; ${domStyle}">${s.dom != null ? s.dom + ' DOM' : '—'}</span>
+                            <span style="min-width:70px; text-align:right">${cut}</span>
+                        </div>`;
+                    }).join('');
+                    html += `<tr><td colspan="9" style="padding:6px 12px 10px; background:#0f172a; text-align:left">
+                        <div style="font-size:12px; color:#94a3b8; margin-bottom:4px">Struggling = active with 60+ DOM or a price cut · click to open in Agent Intelligence</div>
+                        ${items}</td></tr>`;
+                }
+                return html;
+            }).join('');
+
+            const footer = total > 20
+                ? `<div style="margin-top:10px; text-align:center">
+                     <button class="btn btn-outline" onclick="caToggleShowAll()">${caShowAll ? 'Show top 20' : `Show all ${total} agents`}</button>
+                   </div>`
+                : '';
+
+            container.innerHTML = `<div style="overflow-x:auto"><table>${header}<tbody>${body}</tbody></table></div>${footer}`;
+        }
+
         // Check for existing session on load
         (async function init() {
             // [DEV AUTH BYPASS 2026-04-14] Local-only bypass: when served from
@@ -4606,6 +5926,19 @@
                 showApp();
             }
         })();
+    </script>
+    <footer id="buildStamp" style="text-align:center; padding:16px 0 20px; font-family:'SF Mono','Fira Code',monospace; font-size:11px; color:#94a3b8; line-height:1.5"></footer>
+    <script>
+        // Build stamp — regenerated by dashboard/make-build-stamp.sh. Fails silently.
+        fetch('build-stamp.json', { cache: 'no-store' })
+            .then(r => r.ok ? r.json() : null)
+            .then(s => {
+                if (!s || !s.sha) return;
+                const el = document.getElementById('buildStamp');
+                el.textContent = '';
+                el.append('build ' + s.sha, document.createElement('br'), (s.time || '') + ' · web');
+            })
+            .catch(() => {});
     </script>
 </body>
 </html>
