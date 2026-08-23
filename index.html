@@ -1917,10 +1917,16 @@
                 const activeTrend = activeTrendRes.error ? [] : (activeTrendRes.data || []);
                 const salesTrend = salesTrendRes.error ? [] : (salesTrendRes.data || []);
 
+                // One retry for the optional KPI RPCs — a dropped concurrent request
+                // otherwise blanks these cards ("No data in period") until manual refresh.
+                let atListR = atListRes, ppsfR = ppsfRes;
+                if (atListR.error) atListR = await safeRpc('get_sold_at_list_summary', { p_start_date: startDate, p_end_date: endDate });
+                if (ppsfR.error) ppsfR = await safeRpc('get_sold_ppsf', { p_start_date: startDate, p_end_date: endDate });
+
                 // Compute sold-at-or-above-list from raw rows
                 let soldAtListPct = null, soldAtListCount = 0, soldAtListTotal = 0, soldAboveList = 0, soldExactlyAtList = 0;
-                if (!atListRes.error && atListRes.data && atListRes.data[0]) {
-                    const row = atListRes.data[0];
+                if (!atListR.error && atListR.data && atListR.data[0]) {
+                    const row = atListR.data[0];
                     soldAtListTotal = Number(row.total_closed) || 0;
                     soldAtListCount = Number(row.at_or_above) || 0;
                     soldAboveList = Number(row.above_list) || 0;
@@ -1942,7 +1948,7 @@
                 document.getElementById('freshness').textContent =
                     'Sales window: ' + formatDateRange(startDate, endDate);
 
-                const ppsf = (ppsfRes && !ppsfRes.error && ppsfRes.data && ppsfRes.data[0]) ? ppsfRes.data[0] : null;
+                const ppsf = (ppsfR && !ppsfR.error && ppsfR.data && ppsfR.data[0]) ? ppsfR.data[0] : null;
 
                 renderKPIs(active, sales, hidden, soldAtListPct, soldAtListCount, soldAtListTotal, soldAboveList, soldExactlyAtList, ppsf);
                 const pressure = pressureRes.error ? [] : (pressureRes.data || []);
