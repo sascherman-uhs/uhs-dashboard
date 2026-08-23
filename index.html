@@ -871,6 +871,7 @@
         .oh-badge-warm { background: var(--gold); color: var(--navy); }
         .oh-badge-vacant { background: #e8f0e8; color: #2e6b34; }
         .oh-badge-type { background: var(--gray-100); color: var(--gray-600); font-weight: 600; }
+        .oh-badge-broker { background: var(--navy); color: #fff; font-weight: 700; }
         .oh-badge-staged { background: #fdeaea; color: #a33; }
         .oh-day-header {
             background: var(--gray-50); font-weight: 700; color: var(--navy);
@@ -1214,7 +1215,14 @@
                 </label>
                 <label class="oh-check"><input type="checkbox" id="ohWarmOnly" onchange="renderOpenHouses()"> Warm only</label>
                 <label class="oh-check"><input type="checkbox" id="ohVacantOnly" onchange="renderOpenHouses()"> Vacant only</label>
-                <label class="oh-check"><input type="checkbox" id="ohPublicOnly" onchange="renderOpenHouses()"> Public only</label>
+                <label>Type
+                    <select id="ohTypeFilter" onchange="renderOpenHouses()">
+                        <option value="">All types</option>
+                        <option value="Public">Public only</option>
+                        <option value="MLS Wide">Broker opens only</option>
+                        <option value="Virtual">Virtual only</option>
+                    </select>
+                </label>
                 <label>Price
                     <select id="ohPriceDir" onchange="renderOpenHouses()">
                         <option value="">Any</option>
@@ -1224,11 +1232,19 @@
                     <input type="text" id="ohPriceAmt" placeholder="e.g. 750k" style="width:72px"
                         onchange="renderOpenHouses()" onkeyup="if(event.key==='Enter')renderOpenHouses()">
                 </label>
+                <label>Agent
+                    <input type="text" id="ohAgentQ" placeholder="agent or office" style="width:140px"
+                        onchange="renderOpenHouses()" onkeyup="if(event.key==='Enter')renderOpenHouses()"
+                        oninput="if(!this.value)renderOpenHouses()">
+                </label>
             </div>
             <div class="oh-routebar" id="ohRouteBar">
                 <strong style="color:var(--navy)">🗺 Card-Drop Route</strong>
-                <label class="oh-check">Stops <input type="number" id="ohStopN" value="12" min="2" max="20"></label>
+                <label class="oh-check">Stops <input type="number" id="ohStopN" value="10" min="1" max="20"></label>
                 <button class="btn-sm" onclick="ohAutoCluster()">Auto-pick tightest cluster</button>
+                <label class="oh-check">From <input type="text" id="ohFromAddr" placeholder="start address"
+                    style="width:180px" onkeyup="if(event.key==='Enter')ohRouteFromAddress()"></label>
+                <button class="btn-sm" onclick="ohRouteFromAddress()">Route closest</button>
                 <span id="ohRouteSummary">No stops selected — tick rows below or auto-pick</span>
                 <button class="btn-sm" id="ohRouteClear" onclick="ohClearSel()" style="display:none">Clear</button>
             </div>
@@ -4724,6 +4740,7 @@
         let ohColDir = 'asc';
         let ohSelected = new Set();   // mls_numbers picked for the card-drop route
         let ohLastFiltered = [];      // rows surviving the current checkbox filters
+        let ohOrigin = null;          // {latitude, longitude, label} — route start address
 
         // --- Card-drop route planner -----------------------------------------
         function ohMiles(a, b) {
@@ -4734,18 +4751,53 @@
             return 2 * R * Math.asin(Math.sqrt(s));
         }
 
-        // Nearest-neighbor stop order, starting from the northernmost stop
-        function ohNNOrder(stops) {
-            if (stops.length < 3) return stops.slice();
-            const left = stops.slice().sort((a, b) => b.latitude - a.latitude);
-            const path = [left.shift()];
+        // Nearest-neighbor stop order — from `origin` when given, else the northernmost stop
+        function ohNNOrder(stops, origin) {
+            if (stops.length < 2) return stops.slice();
+            const left = stops.slice();
+            const path = [];
+            let cur = origin;
+            if (!cur) {
+                left.sort((a, b) => b.latitude - a.latitude);
+                cur = left.shift();
+                path.push(cur);
+            }
             while (left.length) {
-                const cur = path[path.length - 1];
                 let bi = 0, bd = Infinity;
                 left.forEach((r, i) => { const d = ohMiles(cur, r); if (d < bd) { bd = d; bi = i; } });
-                path.push(left.splice(bi, 1)[0]);
+                cur = left.splice(bi, 1)[0];
+                path.push(cur);
             }
             return path;
+        }
+
+        // Geocode the "From" address, then select and route the N closest OHs in the current view
+        async function ohRouteFromAddress() {
+            const q = document.getElementById('ohFromAddr').value.trim();
+            const sum = document.getElementById('ohRouteSummary');
+            if (!q) { sum.textContent = 'Type a start address first'; return; }
+            const n = Math.max(1, Math.min(20, parseInt(document.getElementById('ohStopN').value) || 10));
+            sum.textContent = 'Locating address…';
+            let hit = null;
+            try {
+                const full = /nv\b|\d{5}/i.test(q) ? q : q + ', Las Vegas, NV';
+                const resp = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q='
+                    + encodeURIComponent(full));
+                hit = (await resp.json())[0];
+            } catch (e) { /* handled below */ }
+            if (!hit) {
+                sum.innerHTML = '<span style="color:var(--red)">Couldn’t locate that address — add city or ZIP and retry</span>';
+                return;
+            }
+            ohOrigin = { latitude: +hit.lat, longitude: +hit.lon, label: q };
+            const cand = ohLastFiltered.filter(r => r.latitude != null && r.longitude != null)
+                .sort((a, b) => ohMiles(ohOrigin, a) - ohMiles(ohOrigin, b));
+            if (!cand.length) {
+                sum.textContent = 'No mappable open houses in the current view';
+                return;
+            }
+            ohSelected = new Set(cand.slice(0, n).map(r => r.mls_number));
+            renderOpenHouses();
         }
 
         function ohAutoCluster() {
@@ -4786,6 +4838,7 @@
 
         function ohClearSel() {
             ohSelected.clear();
+            ohOrigin = null;
             renderOpenHouses();
         }
 
@@ -4801,8 +4854,9 @@
             clearBtn.style.display = '';
             const mappable = sel.filter(r => r.latitude != null && r.longitude != null);
             const unmapped = sel.filter(r => r.latitude == null || r.longitude == null);
-            const stops = ohNNOrder(mappable).concat(unmapped);
+            const stops = ohNNOrder(mappable, ohOrigin).concat(unmapped);
             let miles = 0;
+            if (ohOrigin && mappable.length) miles += ohMiles(ohOrigin, stops[0]);
             for (let i = 1; i < mappable.length; i++) miles += ohMiles(stops[i - 1], stops[i]);
             const driveMi = miles * 1.25;   // straight-line → rough street distance
             const dates = [...new Set(sel.map(r => r.oh_date))].sort();
@@ -4812,13 +4866,17 @@
             const enc = r => encodeURIComponent(
                 `${r.address}${r.unit && !r.address.includes(r.unit) ? ' #' + r.unit : ''}, ${r.city || 'Las Vegas'}, NV ${r.zip_code || ''}`.trim());
             // Google Maps handles ~10 points per link; chain legs sharing an endpoint
+            const pts = (ohOrigin
+                ? [encodeURIComponent(/nv\b|\d{5}/i.test(ohOrigin.label) ? ohOrigin.label : ohOrigin.label + ', Las Vegas, NV')]
+                : []).concat(stops.map(enc));
             const legs = [];
-            for (let i = 0; i < stops.length - 1; i += 9)
-                legs.push('https://www.google.com/maps/dir/' + stops.slice(i, i + 10).map(enc).join('/'));
+            for (let i = 0; i < pts.length - 1; i += 9)
+                legs.push('https://www.google.com/maps/dir/' + pts.slice(i, i + 10).join('/'));
             const legLinks = legs.map((u, i) =>
                 `<a href="${u}" target="_blank">${legs.length > 1 ? `Leg ${i + 1}` : 'Open route in Google Maps'} ↗</a>`
             ).join(' · ');
-            sum.innerHTML = `<strong style="color:var(--navy)">${sel.length} stops</strong> · ~${Math.round(driveMi)} mi drive · ${dayTxt} · ${legLinks}`;
+            const fromTxt = ohOrigin ? ` from <em>${ohOrigin.label}</em>` : '';
+            sum.innerHTML = `<strong style="color:var(--navy)">${sel.length} stops</strong>${fromTxt} · ~${Math.round(driveMi)} mi drive · ${dayTxt} · ${legLinks}`;
         }
 
         function ohDateStr(d) {
@@ -4905,7 +4963,8 @@
             const container = document.getElementById('ohContainer');
             const warmOnly = document.getElementById('ohWarmOnly').checked;
             const vacantOnly = document.getElementById('ohVacantOnly').checked;
-            const publicOnly = document.getElementById('ohPublicOnly').checked;
+            const typeFilter = document.getElementById('ohTypeFilter').value;
+            const agentQ = (document.getElementById('ohAgentQ').value || '').trim().toLowerCase();
             const priceDir = document.getElementById('ohPriceDir').value;
             const priceAmt = ohParsePrice(document.getElementById('ohPriceAmt').value);
             const sort = document.getElementById('ohSort').value;
@@ -4914,7 +4973,9 @@
             let rows = ohRows.filter(r =>
                 (!warmOnly || r.is_warm) &&
                 (!vacantOnly || (r.occupancy || '').toLowerCase().includes('vacant')) &&
-                (!publicOnly || (r.oh_type || 'Public') === 'Public') &&
+                (!typeFilter || (r.oh_type || 'Public') === typeFilter) &&
+                (!agentQ || (r.list_agent_name || '').toLowerCase().includes(agentQ) ||
+                            (r.list_office_name || '').toLowerCase().includes(agentQ)) &&
                 (!priceDir || priceAmt == null ||
                     (priceDir === 'min' ? (r.current_price || 0) >= priceAmt
                                         : (r.current_price || 0) <= priceAmt)));
@@ -4922,11 +4983,13 @@
 
             // KPIs always reflect the loaded window (not the checkbox filters)
             const warmN = ohRows.filter(r => r.is_warm).length;
+            const brokerN = ohRows.filter(r => r.oh_type === 'MLS Wide').length;
             const vacantN = ohRows.filter(r => (r.occupancy || '').toLowerCase().includes('vacant')).length;
             const unstagedVacantN = ohRows.filter(r =>
                 (r.occupancy || '').toLowerCase().includes('vacant') && r.is_staged !== true).length;
             document.getElementById('ohKpiGrid').innerHTML = `
                 <div class="kpi-card"><div class="kpi-label">Open Houses</div><div class="kpi-value">${ohRows.length}</div></div>
+                <div class="kpi-card"><div class="kpi-label">Broker Opens</div><div class="kpi-value" style="color:var(--navy)">${brokerN}</div></div>
                 <div class="kpi-card"><div class="kpi-label">Warm Agents</div><div class="kpi-value" style="color:var(--gold-dark)">${warmN}</div></div>
                 <div class="kpi-card"><div class="kpi-label">Vacant</div><div class="kpi-value">${vacantN}</div></div>
                 <div class="kpi-card"><div class="kpi-label">Vacant + Unstaged</div><div class="kpi-value" style="color:var(--navy)">${unstagedVacantN}</div></div>`;
@@ -4960,7 +5023,10 @@
             }
 
             if (!rows.length) {
-                container.innerHTML = '<div style="padding:20px; color:var(--gray-400); text-align:center">No open houses match</div>';
+                const noMatch = agentQ
+                    ? `No open houses match — “${document.getElementById('ohAgentQ').value.trim()}” has none scheduled in this window`
+                    : 'No open houses match';
+                container.innerHTML = `<div style="padding:20px; color:var(--gray-400); text-align:center">${noMatch}</div>`;
                 ohUpdateRouteBar();
                 return;
             }
@@ -4977,7 +5043,9 @@
                     badges.push('<span class="oh-badge oh-badge-staged" title="Competitor-staged — never pitch staging on this listing">STAGED ⚠</span>');
                 else if (r.staged_by === 'UHS')
                     badges.push('<span class="oh-badge oh-badge-warm" title="Staged by UHS">UHS</span>');
-                const typeTxt = r.oh_type || 'Public';
+                const isBroker = r.oh_type === 'MLS Wide';
+                const typeTxt = isBroker ? 'BROKER' : (r.oh_type || 'Public');
+                const typeCls = isBroker ? 'oh-badge oh-badge-broker' : 'oh-badge oh-badge-type';
                 const addr = r.address + (r.unit && !r.address.includes(r.unit) ? ' #' + r.unit : '');
                 const agentBits = [r.list_agent_name || '—'];
                 if (r.list_agent_phone) agentBits.push(r.list_agent_phone);
@@ -4988,7 +5056,7 @@
                         onchange="ohToggleSel('${r.mls_number}', this.closest('tr'))"></td>
                     <td style="text-align:left; white-space:nowrap">${ohDayLabel(r.oh_date)}<br>
                         <span style="color:var(--gray-500)">${ohFmtTime(r.oh_start)}–${ohFmtTime(r.oh_end)}</span>
-                        <span class="oh-badge oh-badge-type">${typeTxt}</span></td>
+                        <span class="${typeCls}">${typeTxt}</span></td>
                     <td style="text-align:left"><a class="redfin-link" href="${zillowUrl(r.address, r.city)}" target="_blank">${addr}</a> ${badges.join(' ')}</td>
                     <td><a class="mls-link" href="https://www.google.com/search?q=MLS+${r.mls_number}+Las+Vegas+NV" target="_blank">${r.mls_number}</a></td>
                     <td>${r.zip_code || '—'}</td>
