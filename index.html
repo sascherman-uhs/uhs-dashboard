@@ -3209,6 +3209,7 @@
             document.getElementById('agentListingsTitle').textContent =
                 'Listings (' + total + (total === 100 ? '+ max' : '') + ')';
 
+            const oaAgentName = (document.getElementById('agentSearch') || {}).value || null;
             const rows = pageListings.map(l => {
                 const price = l.status === 'S' || l.status === 'H'
                     ? fmtPrice(l.sold_price || l.current_price)
@@ -3247,6 +3248,9 @@
                     <td>${l.dom != null ? l.dom : '—'}</td>
                     <td>${fmtDate(l.list_date)}</td>
                     <td>${fmtClosedOrCOE(l)}</td>
+                    <td style="white-space:nowrap">${l.status && l.status.startsWith('A')
+                        ? oaActionBtns(l.mls_number, l.address, l.city, l.zip_code, oaAgentName, l.agent_email)
+                        : ''}</td>
                 </tr>`;
             }).join('');
 
@@ -3268,6 +3272,7 @@
                         <th>DOM</th>
                         <th>Listed</th>
                         <th>Closed/COE</th>
+                        <th title="Outreach actions (active listings only)">Actions</th>
                     </tr>
                 </thead>
                 <tbody>${rows}</tbody>
@@ -3295,6 +3300,7 @@
             VACANT:             { label: 'Vacant',             bg: '#6b7280' },
             STAGED_UHS:         { label: 'UHS Staged',         bg: '#059669' },
             PHYSICAL_STAGING:   { label: 'Staged',             bg: '#059669' },
+            NEW_BUILD:          { label: 'New Build',          bg: '#0891b2' },
             UNABLE_TO_CLASSIFY: { label: 'Unable to Classify', bg: '#9ca3af' },
             EXTERIOR:           { label: 'Exterior',           bg: '#0284c7' },
             OTHER:              { label: 'Other',              bg: '#9ca3af' }
@@ -3403,9 +3409,15 @@
                 if (currentCls) {
                     const m = CLS_META[currentCls] || { label: currentCls.replace(/_/g, ' '), bg: '#6b7280' };
                     const staged = ['STAGED_COMPETITOR', 'PHYSICAL_STAGING', 'STAGED_UHS', 'VIRTUALLY_STAGED', 'VIRTUAL_STAGING', 'OWNER_FURNISHED'].includes(currentCls);
+                    const newBuild = currentCls === 'NEW_BUILD';
+                    const verdict = newBuild
+                        ? '<div style="color:#b45309;margin-top:5px">⚠ New construction — photos are renders, home not built. Not a staging candidate.</div>'
+                        : staged
+                            ? '<div style="color:#b45309;margin-top:5px">⚠ Appears to already have staging/furnishings.</div>'
+                            : '<div style="color:#166534;margin-top:5px">✓ No competitor/virtual staging detected.</div>';
                     clsEl.innerHTML = `<span style="background:${m.bg};color:white;font-size:11px;padding:2px 8px;border-radius:4px;font-weight:700">${m.label.toUpperCase()}</span>
                         <span style="color:var(--gray-400);margin-left:6px">${currentSrc === 'MANUAL' ? 'human-confirmed 🔒' : (currentSrc || 'AI')}</span>
-                        ${staged ? '<div style="color:#b45309;margin-top:5px">⚠ Appears to already have staging/furnishings.</div>' : '<div style="color:#166534;margin-top:5px">✓ No competitor/virtual staging detected.</div>'}`;
+                        ${verdict}`;
                 } else {
                     clsEl.innerHTML = '<span style="background:#9ca3af;color:white;font-size:11px;padding:2px 8px;border-radius:4px;font-weight:700">UNCLASSIFIED</span> <span style="color:var(--gray-400);margin-left:6px">Not yet reviewed — classify it below while you look at the photos.</span>';
                 }
@@ -3418,6 +3430,7 @@
                     { code: 'OWNER_FURNISHED',    label: 'Owner Furnished',    bg: '#b45309' },
                     { code: 'VACANT',             label: 'Vacant',             bg: '#6b7280' },
                     { code: 'STAGED_UHS',         label: 'UHS Staged',         bg: '#059669' },
+                    { code: 'NEW_BUILD',          label: 'New Build',          bg: '#0891b2' },
                     { code: 'UNABLE_TO_CLASSIFY', label: 'Unable to Classify', bg: '#9ca3af' },
                 ];
                 const locked = currentSrc === 'MANUAL';
@@ -5818,6 +5831,77 @@
             renderClientAgents();
         }
 
+        // =====================================================================
+        // Per-listing outreach actions — snapshot-email + staging-report queues.
+        // Buttons render on ACTIVE rows in Agent Intelligence listings and in the
+        // Client Agents struggling drill-down. Both RPCs are SECURITY DEFINER and
+        // RAISE human-readable errors (already staged, no email, rate cap, etc.).
+        // =====================================================================
+        function oaActionBtns(mls, address, city, zip, agentName, agentEmail) {
+            const q = v => (v == null || v === '') ? 'null'
+                : `'${String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;')}'`;
+            const st = 'font-size:10px;padding:1px 6px;border:1px solid #94a3b8;border-radius:4px;background:transparent;color:inherit;cursor:pointer;white-space:nowrap';
+            return `<button style="${st}" title="Queue a neighborhood-snapshot outreach email to the listing agent — lands in Outlook Drafts for review" onclick="event.stopPropagation();queueSnapEmail(${q(mls)}, this)">✉️ Snap</button>
+                <button style="${st}" title="Queue a staging report request" onclick="event.stopPropagation();queueReport(${q(mls)}, ${q(address)}, ${q(city)}, ${q(zip)}, ${q(agentName)}, ${q(agentEmail)}, this)">📊 Rpt</button>`;
+        }
+
+        // Transient inline note next to a button (no alert/confirm — they break automation)
+        function oaInlineNote(btn, msg, isError) {
+            const note = document.createElement('span');
+            note.textContent = msg;
+            note.style.cssText = `font-size:10px;margin-left:6px;font-weight:600;color:${isError ? '#ef4444' : '#059669'};transition:opacity .8s`;
+            btn.insertAdjacentElement('afterend', note);
+            setTimeout(() => { note.style.opacity = '0'; setTimeout(() => note.remove(), 900); }, 7000);
+        }
+
+        async function queueSnapEmail(mls, btn) {
+            btn.disabled = true;
+            btn.textContent = '⏳';
+            try {
+                const res = await rpcWithTimeout('queue_outreach_draft', {
+                    p_mls_number: mls,
+                    p_requested_by: 'uhsMLS-dashboard',
+                    p_requested_from: location.hostname
+                }, 15000);
+                btn.textContent = (res && res.status === 'already_queued') ? '✅ Already queued' : '✅ Queued';
+                btn.title = 'Draft lands in Outlook Drafts (with snapshot PDF) within ~2 minutes';
+            } catch (e) {
+                const msg = (e && e.message) || String(e);
+                btn.disabled = false;
+                btn.textContent = '✖';
+                btn.title = msg;
+                oaInlineNote(btn, msg, true);
+            }
+        }
+
+        async function queueReport(mls, address, city, zip, agentName, agentEmail, btn) {
+            btn.disabled = true;
+            btn.textContent = '⏳';
+            try {
+                const res = await rpcWithTimeout('queue_proximity_report_request', {
+                    p_property_address: address,
+                    p_mls_number: mls,
+                    p_city: city,
+                    p_zip: zip,
+                    p_agent_name: agentName || null,
+                    p_agent_email: agentEmail || null,
+                    p_nearby_project_address: null,
+                    p_requested_by: 'uhsMLS-dashboard',
+                    p_guidance_note: null,
+                    p_transmittal_instructions: null,
+                    p_testimonial_project_id: null
+                }, 15000);
+                btn.textContent = (res && res.status === 'already_queued') ? '✅ Already queued' : '✅ Queued';
+                btn.title = 'Staging report request queued';
+            } catch (e) {
+                const msg = (e && e.message) || String(e);
+                btn.disabled = false;
+                btn.textContent = '✖';
+                btn.title = msg;
+                oaInlineNote(btn, msg, true);
+            }
+        }
+
         // Deep-link into Agent Intelligence (needs the exact MLS-side name)
         function caOpenAgent(name) {
             if (!name) return;
@@ -5897,6 +5981,7 @@
                             <span style="min-width:90px; text-align:right; color:#e2e8f0">${fmtPrice(s.price)}</span>
                             <span style="min-width:70px; text-align:right; ${domStyle}">${s.dom != null ? s.dom + ' DOM' : '—'}</span>
                             <span style="min-width:70px; text-align:right">${cut}</span>
+                            <span style="white-space:nowrap">${oaActionBtns(s.mls_number, s.address, s.city, null, r.mls_agent_name || r.agent_name, null)}</span>
                         </div>`;
                     }).join('');
                     html += `<tr><td colspan="9" style="padding:6px 12px 10px; background:#0f172a; text-align:left">
