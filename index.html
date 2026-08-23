@@ -1919,9 +1919,10 @@
 
                 // One retry for the optional KPI RPCs — a dropped concurrent request
                 // otherwise blanks these cards ("No data in period") until manual refresh.
-                let atListR = atListRes, ppsfR = ppsfRes;
+                let atListR = atListRes, ppsfR = ppsfRes, pressureR = pressureRes;
                 if (atListR.error) atListR = await safeRpc('get_sold_at_list_summary', { p_start_date: startDate, p_end_date: endDate });
                 if (ppsfR.error) ppsfR = await safeRpc('get_sold_ppsf', { p_start_date: startDate, p_end_date: endDate });
+                if (pressureR.error) pressureR = await safeRpc('get_market_pressure_dashboard');
 
                 // Compute sold-at-or-above-list from raw rows
                 let soldAtListPct = null, soldAtListCount = 0, soldAtListTotal = 0, soldAboveList = 0, soldExactlyAtList = 0;
@@ -1951,7 +1952,7 @@
                 const ppsf = (ppsfR && !ppsfR.error && ppsfR.data && ppsfR.data[0]) ? ppsfR.data[0] : null;
 
                 renderKPIs(active, sales, hidden, soldAtListPct, soldAtListCount, soldAtListTotal, soldAboveList, soldExactlyAtList, ppsf);
-                const pressure = pressureRes.error ? [] : (pressureRes.data || []);
+                const pressure = pressureR.error ? [] : (pressureR.data || []);
                 renderMarketPressure(pressure);
                 renderCharts(active, sales);
                 renderTable(active, sales);
